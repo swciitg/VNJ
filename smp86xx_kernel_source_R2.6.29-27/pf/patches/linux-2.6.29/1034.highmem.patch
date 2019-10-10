@@ -1,0 +1,1096 @@
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/include/asm/kmap_types.h linux-2.6.29/arch/mips/include/asm/kmap_types.h
+--- linux-2.6.29.ref/arch/mips/include/asm/kmap_types.h	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/arch/mips/include/asm/kmap_types.h	2011-06-09 17:36:52.756434141 -0700
+@@ -22,7 +22,14 @@
+ D(10)	KM_IRQ1,
+ D(11)	KM_SOFTIRQ0,
+ D(12)	KM_SOFTIRQ1,
+-D(13)	KM_TYPE_NR
++D(13)	KM_SYNC_ICACHE,
++D(14)	KM_SYNC_DCACHE,
++/* UML specific, for copy_*_user - used in do_op_one_page */
++D(15)	KM_UML_USERCOPY,
++D(16)	KM_IRQ_PTE,
++D(17)	KM_NMI,
++D(18)	KM_NMI_PTE,
++D(19)	KM_TYPE_NR
+ };
+ 
+ #undef D
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/include/asm/tango3/hardware.h linux-2.6.29/arch/mips/include/asm/tango3/hardware.h
+--- linux-2.6.29.ref/arch/mips/include/asm/tango3/hardware.h	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/arch/mips/include/asm/tango3/hardware.h	2011-06-09 17:36:52.756434141 -0700
+@@ -117,8 +117,10 @@
+ 	extern unsigned long em8xxx_kmem_size;
+ 
+ 	if ((physaddr < CPU_REMAP_SPACE) || (physaddr >= (CPU_REMAP_SPACE + em8xxx_kmem_size))) {
+-/*		printk("<3>" "dma_address conversion failure (0x%08lx in range 0x%08lx-0x%08lx)\n", */
+-/*			physaddr, (unsigned long)CPU_REMAP_SPACE, (unsigned long)CPU_REMAP_SPACE + em8xxx_kmem_size); */
++#if !defined(CONFIG_SD_DIRECT_DMA) && !defined(CONFIG_HIGHMEM)
++//		printk("<3>" "dma_address conversion failure (0x%08lx in range 0x%08lx-0x%08lx)\n", 
++//			physaddr, (unsigned long)CPU_REMAP_SPACE, (unsigned long)CPU_REMAP_SPACE + em8xxx_kmem_size); 
++#endif
+ 		return(physaddr); /* use whatever is specified */
+ 	} else {
+ 		return(em8xxx_remap_registers[((physaddr & 0x1c000000UL) >> 26) + 1] + (physaddr & 0x03ffffffUL));
+@@ -132,6 +134,7 @@
+ 	extern unsigned long em8xxx_kmem_size;
+ 	int i;
+ 	unsigned long msize = 0, offset = mapaddr & 0x03ffffffUL, base = mapaddr & 0xfc000000UL;
++
+ 	for (i = REMAP_IDX; (msize < em8xxx_kmem_size) && (i < 9); msize += 0x04000000, i++) {
+ 		if (base == em8xxx_remap_registers[i]) {	/* found the remap register to match */
+ 			if (((em8xxx_kmem_size - msize) >= 0x04000000UL) || ((em8xxx_kmem_size - msize) > offset))
+@@ -140,7 +143,9 @@
+ 				break;	/* outside kernel memory area, don't translate it */
+ 		}
+ 	}
+-/*	printk("<3>" "dma_address inversion failure (0x%08lx)\n", mapaddr); */
++#if !defined(CONFIG_SD_DIRECT_DMA) && !defined(CONFIG_HIGHMEM)
++//	printk("<3>" "dma_address inversion failure (0x%08lx)\n", mapaddr); 
++#endif
+ 	return(mapaddr); /* use whatever is specified */
+ }
+ #endif
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/Kconfig linux-2.6.29/arch/mips/Kconfig
+--- linux-2.6.29.ref/arch/mips/Kconfig	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/arch/mips/Kconfig	2011-06-09 17:36:52.756434141 -0700
+@@ -563,6 +563,7 @@
+ 	select SYS_SUPPORTS_LITTLE_ENDIAN
+ 	select SYS_HAS_CPU_MIPS32_R1
+ 	select SYS_HAS_CPU_MIPS32_R2
++	select SYS_SUPPORTS_HIGHMEM
+ 	select OWN_DMA
+ 	select DMA_TANGOX
+ 	select ZONE_DMA
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/kernel/setup.c linux-2.6.29/arch/mips/kernel/setup.c
+--- linux-2.6.29.ref/arch/mips/kernel/setup.c	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/arch/mips/kernel/setup.c	2011-06-09 17:36:52.756434141 -0700
+@@ -470,6 +470,10 @@
+ #ifdef CONFIG_TANGOX
+         extern unsigned long em8xxx_kmem_start;
+         extern unsigned long em8xxx_kmem_size;
++#ifdef CONFIG_HIGHMEM
++	extern unsigned long em8xxx_himem_start;
++	extern unsigned long em8xxx_himem_size;
++#endif
+ #endif
+ 
+ 	/*
+@@ -494,6 +498,7 @@
+         }
+ 
+ #ifdef CONFIG_TANGOX
++	printk("parsing kernel command line for memory options ..\n");
+ 	if (start == CPHYSADDR(em8xxx_kmem_start)) {
+ 		void tangox_mem_setup(unsigned long size);
+ 		tangox_mem_setup(size);
+@@ -502,6 +507,12 @@
+ 		/* We just add this blindly as the alignment can be wrong, use it as own risk */
+ 		add_memory_region(start, size, BOOT_MEM_RAM);
+ 	}
++#ifdef CONFIG_HIGHMEM
++	if ((em8xxx_himem_start != 0) && (em8xxx_himem_size != 0)) {
++		add_memory_region(em8xxx_himem_start, em8xxx_himem_size, BOOT_MEM_RAM);
++		printk("adding [0x%08lx..0x%08lx) as highmem area.\n", em8xxx_himem_start, em8xxx_himem_start + em8xxx_himem_size);
++	}
++#endif
+ #else
+ 	add_memory_region(start, size, BOOT_MEM_RAM);
+ #endif 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/mm/dma-tangox.c linux-2.6.29/arch/mips/mm/dma-tangox.c
+--- linux-2.6.29.ref/arch/mips/mm/dma-tangox.c	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/arch/mips/mm/dma-tangox.c	2011-06-09 17:36:52.756434141 -0700
+@@ -14,6 +14,7 @@
+ #include <linux/module.h>
+ #include <linux/scatterlist.h>
+ #include <linux/string.h>
++#include <linux/highmem.h>
+ 
+ #include <asm/cache.h>
+ #include <asm/io.h>
+@@ -40,27 +41,33 @@
+ #endif
+ 
+ #ifdef CONFIG_PCI
+-static inline unsigned long __pci_virt_to_bus(unsigned long virt)
++static inline unsigned long __pci_phys_to_bus(unsigned long physaddr)
+ {
+-	unsigned long physaddr = CPHYSADDR(virt);
+ 	if ((physaddr < g_pcimem_physaddr) || (physaddr >= g_pcimem_physaddr_end)) {
+-		printk("virt2bus: Not a dma-able address: 0x%08lx\n", virt);
++		printk("phys2bus: Not a dma-able address: 0x%08lx\n", physaddr);
+ 		return 0;
+ 	}
+-	return((unsigned long)((physaddr - g_pcimem_physaddr) +
+-			       g_pcimem_busaddr));
++	return (unsigned long)((physaddr - g_pcimem_physaddr) + g_pcimem_busaddr);
+ }
+ 
+-static inline unsigned long __pci_bus_to_virt(unsigned long busaddr)
++static inline unsigned long __pci_virt_to_bus(unsigned long virt)
++{
++	return __pci_phys_to_bus(CPHYSADDR(virt));
++}
++
++static inline unsigned long __pci_bus_to_phys(unsigned long busaddr) 
+ {
+ 	if ((busaddr < g_pcimem_busaddr) ||
+ 	    (busaddr >= (g_pcimem_busaddr + (g_pcimem_physaddr_end - g_pcimem_physaddr)))) {
+-		printk("bus2virt: Not a valid bus address: 0x%08lx\n",
+-		       busaddr);
++		printk("bus2phys: Not a valid bus address: 0x%08lx\n", busaddr);
+ 		return 0;
+ 	}
+-	return((unsigned long)phys_to_virt((busaddr - g_pcimem_busaddr) +
+-			       g_pcimem_physaddr));
++	return (unsigned long)(busaddr - g_pcimem_busaddr) + g_pcimem_physaddr;
++}
++
++static inline unsigned long __pci_bus_to_virt(unsigned long busaddr)
++{
++	return (unsigned long)phys_to_virt(__pci_bus_to_phys(busaddr));
+ }
+ #else
+ static inline unsigned long __pci_virt_to_bus(unsigned long addr)
+@@ -80,38 +87,47 @@
+ {
+ 	return __pci_virt_to_bus(addr);
+ }
+-
+ EXPORT_SYMBOL(pci_virt_to_bus);
+ 
+ unsigned long pci_bus_to_virt(unsigned long addr)
+ {
+ 	return __pci_bus_to_virt(addr);
+ }
+-
+ EXPORT_SYMBOL(pci_bus_to_virt);
+ 
+-static inline dma_addr_t plat_map_dma_mem(struct device *dev, void *addr, size_t size)
++static inline unsigned long plat_dma_addr_to_phys(struct device *dev, dma_addr_t dma_addr)
+ {
+-	if (IS_PCIDEV(dev))
+-		return __pci_virt_to_bus((unsigned long)addr);
+-	return tangox_dma_address(virt_to_phys(addr));
++#ifdef CONFIG_PCI
++	if (IS_PCIDEV(dev)) {
++		if ((dma_addr >= g_pcimem_busaddr) &&
++		    (dma_addr < (g_pcimem_busaddr + (g_pcimem_physaddr_end - g_pcimem_physaddr)))) 
++			return __pci_bus_to_phys(dma_addr);
++	}
++#endif
++	return tangox_inv_dma_address(dma_addr);
+ }
+ 
+-static inline dma_addr_t plat_map_dma_mem_page(struct device *dev, struct page *page)
++static inline struct page *dma_addr_to_page(struct device *dev, dma_addr_t dma_addr)
+ {
++	return pfn_to_page(plat_dma_addr_to_phys(dev, dma_addr) >> PAGE_SHIFT);
++}
++
++static inline dma_addr_t plat_map_dma_mem(struct device *dev, void *physaddr, size_t size)
++{
++#ifdef CONFIG_PCI
+ 	if (IS_PCIDEV(dev))
+-		return __pci_virt_to_bus((unsigned long)page_to_phys(page));
+-	return tangox_dma_address(page_to_phys(page));
++		return __pci_virt_to_bus((unsigned long)physaddr);
++#endif
++	return tangox_dma_address((unsigned long)physaddr);
+ }
+ 
+-static inline unsigned long plat_dma_addr_to_phys(dma_addr_t dma_addr)
++static inline dma_addr_t plat_map_dma_mem_page(struct device *dev, struct page *page)
+ {
+ #ifdef CONFIG_PCI
+-	if ((dma_addr >= g_pcimem_busaddr) &&
+-	    (dma_addr < (g_pcimem_busaddr + (g_pcimem_physaddr_end - g_pcimem_physaddr)))) 
+-		return((unsigned long)(dma_addr - g_pcimem_busaddr) + g_pcimem_physaddr);
++	if (IS_PCIDEV(dev))
++		return __pci_virt_to_bus((unsigned long)page_to_phys(page));
+ #endif
+-	return tangox_inv_dma_address(dma_addr);
++	return tangox_dma_address(page_to_phys(page));
+ }
+ 
+ static inline void plat_unmap_dma_mem(struct device *dev, dma_addr_t dma_addr)
+@@ -124,13 +140,6 @@
+ 	return 0; /* Always noncoherent for Tango2/3/4 */
+ }
+ 
+-static inline unsigned long dma_addr_to_virt(dma_addr_t dma_addr)
+-{
+-	unsigned long addr = plat_dma_addr_to_phys(dma_addr);
+-
+-	return (unsigned long)phys_to_virt(addr);
+-}
+-
+ static inline int plat_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+ {
+ 	return (dma_addr == 0) ? 1 : 0;
+@@ -192,86 +201,72 @@
+ }
+ 
+ void *dma_alloc_noncoherent(struct device *dev, size_t size,
+-	dma_addr_t * dma_handle, gfp_t gfp)
++	dma_addr_t *dma_handle, gfp_t gfp)
+ {
+ 	void *ret;
+ 
+ 	gfp = massage_gfp_flags(dev, gfp);
+ 
+-	ret = (void *) __get_free_pages(gfp, get_order(size));
++	ret = (void *)__get_free_pages(gfp, get_order(size));
+ 
+ 	if (ret != NULL) {
+ 		memset(ret, 0, size);
+-		*dma_handle = plat_map_dma_mem(dev, ret, size);
++		*dma_handle = plat_map_dma_mem(dev, (void *)virt_to_phys(ret), size);
+ 	}
+ 
+ 	return ret;
+ }
+-
+ EXPORT_SYMBOL(dma_alloc_noncoherent);
+ 
+ void *dma_alloc_coherent(struct device *dev, size_t size,
+-	dma_addr_t * dma_handle, gfp_t gfp)
++	dma_addr_t *dma_handle, gfp_t gfp)
+ {
+ 	void *ret;
+ 
+-	gfp = massage_gfp_flags(dev, gfp);
+-
+-	ret = (void *) __get_free_pages(gfp, get_order(size));
+-
+-	if (ret) {
+-		memset(ret, 0, size);
+-		*dma_handle = plat_map_dma_mem(dev, ret, size);
+-
++	ret = dma_alloc_noncoherent(dev, size, dma_handle, gfp);
++	if (ret != NULL) {
+ 		if (!plat_device_is_coherent(dev)) {
+-			dma_cache_wback_inv((unsigned long) ret, size);
++			dma_cache_wback_inv((unsigned long)ret, size);
+ 			ret = UNCAC_ADDR(ret);
+ 		}
+ 	}
+-
+ 	return ret;
+ }
+-
+ EXPORT_SYMBOL(dma_alloc_coherent);
+ 
+ void dma_free_noncoherent(struct device *dev, size_t size, void *vaddr,
+ 	dma_addr_t dma_handle)
+ {
+ 	plat_unmap_dma_mem(dev, dma_handle);
+-	free_pages((unsigned long) vaddr, get_order(size));
++	free_pages((unsigned long)vaddr, get_order(size));
+ }
+-
+ EXPORT_SYMBOL(dma_free_noncoherent);
+ 
+ void dma_free_coherent(struct device *dev, size_t size, void *vaddr,
+ 	dma_addr_t dma_handle)
+ {
+-	unsigned long addr = (unsigned long) vaddr;
+-
+-	plat_unmap_dma_mem(dev, dma_handle);
++	unsigned long addr = (unsigned long)vaddr;
+ 
+ 	if (!plat_device_is_coherent(dev))
+ 		addr = CAC_ADDR(addr);
+-
+-	free_pages(addr, get_order(size));
++	dma_free_noncoherent(dev, size, (void *)addr, dma_handle);
+ }
+-
+ EXPORT_SYMBOL(dma_free_coherent);
+ 
+-static inline void __dma_sync(unsigned long addr, size_t size,
++static inline void __dma_sync_virtual(void *addr, size_t size,
+ 	enum dma_data_direction direction)
+ {
+ 	switch (direction) {
+ 	case DMA_TO_DEVICE:
+-		dma_cache_wback(addr, size);
++		dma_cache_wback((unsigned long)addr, size);
+ 		break;
+ 
+ 	case DMA_FROM_DEVICE:
+-		dma_cache_inv(addr, size);
++		dma_cache_inv((unsigned long)addr, size);
+ 		break;
+ 
+ 	case DMA_BIDIRECTIONAL:
+-		dma_cache_wback_inv(addr, size);
++		dma_cache_wback_inv((unsigned long)addr, size);
+ 		break;
+ 
+ 	default:
+@@ -279,29 +274,67 @@
+ 	}
+ }
+ 
++/* 
++ * A single sg entry may refer to multiple physically contiguous
++ * pages, But we still need to processs highmem pages individually.
++ * If highmem is not configured then the bulk of this loops gets
++ * optimized out.
++ */
++static inline void __dma_sync(struct page *page, unsigned long offset, 
++				size_t size, enum dma_data_direction direction)
++{
++	size_t left = size;
++	do {
++		size_t len = left;
++		if (PageHighMem(page)) {
++			unsigned long flags;
++			void *addr;
++			if (offset + len > PAGE_SIZE) {
++				if (offset >= PAGE_SIZE) {
++					page += (offset >> PAGE_SHIFT);
++					offset &= ~PAGE_MASK;
++				}
++				len = PAGE_SIZE - offset;
++			}
++			local_irq_save(flags);
++			addr = kmap_atomic(page, KM_SYNC_DCACHE);
++			__dma_sync_virtual(addr + offset, len, direction);
++			kunmap_atomic(addr, KM_SYNC_DCACHE);
++			local_irq_restore(flags);
++		} else
++			__dma_sync_virtual(page_address(page) + offset, size, direction);
++		offset = 0;
++		page++;
++		left -= len;
++	} while (left);
++}
++
+ dma_addr_t dma_map_single(struct device *dev, void *ptr, size_t size,
+ 	enum dma_data_direction direction)
+ {
+-	unsigned long addr = (unsigned long) ptr;
++	extern unsigned long tangox_virt_to_phys(void *);
++	dma_addr_t dma_addr;
++	unsigned long paddr = tangox_virt_to_phys(ptr);
+ 
+-	if (!plat_device_is_coherent(dev))
+-		__dma_sync(addr, size, direction);
++	if (paddr < HIGHMEM_START)
++		dma_addr = plat_map_dma_mem(dev, (void *)paddr, size);
++	else
++		dma_addr = paddr; /* direct gbus address, mostly by highmem */
+ 
+-	return plat_map_dma_mem(dev, ptr, size);
++	if (!plat_device_is_coherent(dev)) 
++		__dma_sync(dma_addr_to_page(dev, dma_addr), dma_addr & ~PAGE_MASK, size, direction);
++	return dma_addr;
+ }
+-
+ EXPORT_SYMBOL(dma_map_single);
+ 
+ void dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
+ 	enum dma_data_direction direction)
+ {
+ 	if (cpu_is_noncoherent_r10000(dev))
+-		__dma_sync(dma_addr_to_virt(dma_addr), size,
+-		           direction);
++		__dma_sync(dma_addr_to_page(dev, dma_addr), dma_addr & ~PAGE_MASK, size, direction);
+ 
+ 	plat_unmap_dma_mem(dev, dma_addr);
+ }
+-
+ EXPORT_SYMBOL(dma_unmap_single);
+ 
+ int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+@@ -312,18 +345,13 @@
+ 	BUG_ON(direction == DMA_NONE);
+ 
+ 	for (i = 0; i < nents; i++, sg++) {
+-		unsigned long addr;
+-
+-		addr = (unsigned long) sg_virt(sg);
+-		if (!plat_device_is_coherent(dev) && addr)
+-			__dma_sync(addr, sg->length, direction);
+-		sg->dma_address = plat_map_dma_mem(dev,
+-				                   (void *)addr, sg->length);
++		if (!plat_device_is_coherent(dev))
++			__dma_sync(sg_page(sg), sg->offset, sg->length, direction);
++		sg->dma_address = plat_map_dma_mem_page(dev, sg_page(sg)) + sg->offset;
+ 	}
+ 
+ 	return nents;
+ }
+-
+ EXPORT_SYMBOL(dma_map_sg);
+ 
+ dma_addr_t dma_map_page(struct device *dev, struct page *page,
+@@ -331,16 +359,11 @@
+ {
+ 	BUG_ON(direction == DMA_NONE);
+ 
+-	if (!plat_device_is_coherent(dev)) {
+-		unsigned long addr;
+-
+-		addr = (unsigned long) page_address(page) + offset;
+-		dma_cache_wback_inv(addr, size);
+-	}
++	if (!plat_device_is_coherent(dev)) 
++		__dma_sync(page, offset, size, direction);
+ 
+ 	return plat_map_dma_mem_page(dev, page) + offset;
+ }
+-
+ EXPORT_SYMBOL(dma_map_page);
+ 
+ void dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
+@@ -348,37 +371,26 @@
+ {
+ 	BUG_ON(direction == DMA_NONE);
+ 
+-	if (!plat_device_is_coherent(dev) && direction != DMA_TO_DEVICE) {
+-		unsigned long addr;
+-
+-		addr = dma_addr_to_virt(dma_address);
+-		dma_cache_wback_inv(addr, size);
+-	}
++	if (!plat_device_is_coherent(dev) && direction != DMA_TO_DEVICE) 
++		__dma_sync(dma_addr_to_page(dev, dma_address), dma_address & ~PAGE_MASK, size, direction);
+ 
+ 	plat_unmap_dma_mem(dev, dma_address);
+ }
+-
+ EXPORT_SYMBOL(dma_unmap_page);
+ 
+ void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
+ 	enum dma_data_direction direction)
+ {
+-	unsigned long addr;
+ 	int i;
+ 
+ 	BUG_ON(direction == DMA_NONE);
+ 
+ 	for (i = 0; i < nhwentries; i++, sg++) {
+-		if (!plat_device_is_coherent(dev) &&
+-		    direction != DMA_TO_DEVICE) {
+-			addr = (unsigned long) sg_virt(sg);
+-			if (addr)
+-				__dma_sync(addr, sg->length, direction);
+-		}
++		if (!plat_device_is_coherent(dev) && direction != DMA_TO_DEVICE) 
++			__dma_sync(sg_page(sg), sg->offset, sg->length, direction);
+ 		plat_unmap_dma_mem(dev, sg->dma_address);
+ 	}
+ }
+-
+ EXPORT_SYMBOL(dma_unmap_sg);
+ 
+ void dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle,
+@@ -387,13 +399,10 @@
+ 	BUG_ON(direction == DMA_NONE);
+ 
+ 	if (cpu_is_noncoherent_r10000(dev)) {
+-		unsigned long addr;
+-
+-		addr = dma_addr_to_virt(dma_handle);
+-		__dma_sync(addr, size, direction);
++		__dma_sync(dma_addr_to_page(dev, dma_handle),
++				dma_handle & ~PAGE_MASK, size, direction);
+ 	}
+ }
+-
+ EXPORT_SYMBOL(dma_sync_single_for_cpu);
+ 
+ void dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle,
+@@ -403,13 +412,10 @@
+ 
+ 	plat_extra_sync_for_device(dev);
+ 	if (!plat_device_is_coherent(dev)) {
+-		unsigned long addr;
+-
+-		addr = dma_addr_to_virt(dma_handle);
+-		__dma_sync(addr, size, direction);
++		__dma_sync(dma_addr_to_page(dev, dma_handle),
++				dma_handle & ~PAGE_MASK, size, direction);
+ 	}
+ }
+-
+ EXPORT_SYMBOL(dma_sync_single_for_device);
+ 
+ void dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
+@@ -418,13 +424,10 @@
+ 	BUG_ON(direction == DMA_NONE);
+ 
+ 	if (cpu_is_noncoherent_r10000(dev)) {
+-		unsigned long addr;
+-
+-		addr = dma_addr_to_virt(dma_handle);
+-		__dma_sync(addr + offset, size, direction);
++		__dma_sync(dma_addr_to_page(dev, dma_handle + offset),
++				dma_handle & ~PAGE_MASK, size, direction);
+ 	}
+ }
+-
+ EXPORT_SYMBOL(dma_sync_single_range_for_cpu);
+ 
+ void dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
+@@ -434,13 +437,10 @@
+ 
+ 	plat_extra_sync_for_device(dev);
+ 	if (!plat_device_is_coherent(dev)) {
+-		unsigned long addr;
+-
+-		addr = dma_addr_to_virt(dma_handle);
+-		__dma_sync(addr + offset, size, direction);
++		__dma_sync(dma_addr_to_page(dev, dma_handle + offset),
++				dma_handle & ~PAGE_MASK, size, direction);
+ 	}
+ }
+-
+ EXPORT_SYMBOL(dma_sync_single_range_for_device);
+ 
+ void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
+@@ -453,11 +453,9 @@
+ 	/* Make sure that gcc doesn't leave the empty loop body.  */
+ 	for (i = 0; i < nelems; i++, sg++) {
+ 		if (cpu_is_noncoherent_r10000(dev))
+-			__dma_sync((unsigned long)page_address(sg_page(sg)),
+-			           sg->length, direction);
++			__dma_sync(sg_page(sg), sg->offset, sg->length, direction);
+ 	}
+ }
+-
+ EXPORT_SYMBOL(dma_sync_sg_for_cpu);
+ 
+ void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
+@@ -470,42 +468,26 @@
+ 	/* Make sure that gcc doesn't leave the empty loop body.  */
+ 	for (i = 0; i < nelems; i++, sg++) {
+ 		if (!plat_device_is_coherent(dev))
+-			__dma_sync((unsigned long)page_address(sg_page(sg)),
+-			           sg->length, direction);
++			__dma_sync(sg_page(sg), sg->offset, sg->length, direction);
+ 	}
+ }
+-
+ EXPORT_SYMBOL(dma_sync_sg_for_device);
+ 
+ int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+ {
+ 	return plat_dma_mapping_error(dev, dma_addr);
+ }
+-
+ EXPORT_SYMBOL(dma_mapping_error);
+ 
+ int dma_supported(struct device *dev, u64 mask)
+ {
+ 	return plat_dma_supported(dev, mask);
+ }
+-
+ EXPORT_SYMBOL(dma_supported);
+ 
+ int dma_is_consistent(struct device *dev, dma_addr_t dma_addr)
+ {
+ 	return plat_device_is_coherent(dev);
+ }
+-
+ EXPORT_SYMBOL(dma_is_consistent);
+ 
+-void dma_cache_sync(struct device *dev, void *vaddr, size_t size,
+-	       enum dma_data_direction direction)
+-{
+-	BUG_ON(direction == DMA_NONE);
+-
+-	plat_extra_sync_for_device(dev);
+-	if (!plat_device_is_coherent(dev))
+-		__dma_sync((unsigned long)vaddr, size, direction);
+-}
+-
+-EXPORT_SYMBOL(dma_cache_sync);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/tangox/Kconfig linux-2.6.29/arch/mips/tangox/Kconfig
+--- linux-2.6.29.ref/arch/mips/tangox/Kconfig	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/arch/mips/tangox/Kconfig	2011-06-09 17:39:30.936579396 -0700
+@@ -24,6 +24,7 @@
+ 	select TANGO3_865X
+ 	select TANGO3_8652
+ 	select TANGO3
++	select HIGHMEM
+ 	help 
+ 	  Support for Sigma Designs SMP8652 chip (Tango3 architecture).
+ 
+@@ -33,6 +34,7 @@
+ 	select TANGO3_865X
+ 	select TANGO3_8654
+ 	select TANGO3
++	select HIGHMEM
+ 	help 
+ 	  Support for Sigma Designs SMP8654 chip (Tango3 architecture).
+ 
+@@ -41,6 +43,7 @@
+ 	select TANGO3_SMP86XX
+ 	select TANGO3_865X
+ 	select TANGO3
++	select HIGHMEM
+ 	help 
+ 	  Support for Sigma Designs SMP8656 chip with OTP technology (aka 8656PS4/8656Bxx, Tango3)).
+ 
+@@ -49,6 +52,7 @@
+ 	select TANGO3_SMP86XX
+ 	select TANGO3_865X
+ 	select TANGO3
++	select HIGHMEM
+ 	help 
+ 	  Support for Sigma Designs SMP8656 chip with embedded serial flash (aka 8656ES1/8656ES5/8656Axx/8656Cxx, Tango3)).
+ 
+@@ -84,6 +88,7 @@
+ 	select TANGO3_SMP86XX
+ 	select TANGO3_867X
+ 	select TANGO3
++	select HIGHMEM
+ 	help
+ 	  Sigma Designs SMP8670 chip (MIPS 24Kf core based), ES1 or above (Tango3).
+ 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/tangox/mbus.c linux-2.6.29/arch/mips/tangox/mbus.c
+--- linux-2.6.29.ref/arch/mips/tangox/mbus.c	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/arch/mips/tangox/mbus.c	2011-06-09 17:36:52.756434141 -0700
+@@ -524,7 +524,7 @@
+ {
+ 	unsigned long flgs;
+ 	unsigned int rwbase;
+-#ifndef CONFIG_SD_DIRECT_DMA
++#if !defined(CONFIG_SD_DIRECT_DMA) && !defined(CONFIG_HIGHMEM)
+ 	if ((tangox_inv_dma_address(addr) < CPHYSADDR(em8xxx_kmem_start)) || (tangox_inv_dma_address(addr) >= (CPHYSADDR(em8xxx_kmem_start) + em8xxx_kmem_size)))
+ 		printk("MBUS Warning (linear): bad transfer address 0x%08x\n", addr);
+ #endif
+@@ -563,7 +563,7 @@
+ {
+ 	unsigned long flgs;
+ 	unsigned int rwbase;
+-#ifndef CONFIG_SD_DIRECT_DMA
++#if !defined(CONFIG_SD_DIRECT_DMA) && !defined(CONFIG_HIGHMEM)
+ 	if ((tangox_inv_dma_address(addr) < CPHYSADDR(em8xxx_kmem_start)) || (tangox_inv_dma_address(addr) >= (CPHYSADDR(em8xxx_kmem_start) + em8xxx_kmem_size)))
+ 		printk("MBUS Warning (double): bad transfer address 0x%08x\n", addr);
+ 	if ((tangox_inv_dma_address(addr2) < CPHYSADDR(em8xxx_kmem_start)) || (tangox_inv_dma_address(addr2) >= (CPHYSADDR(em8xxx_kmem_start) + em8xxx_kmem_size)))
+@@ -604,7 +604,7 @@
+ {
+ 	unsigned long flgs;
+ 	unsigned int rwbase;
+-#ifndef CONFIG_SD_DIRECT_DMA
++#if !defined(CONFIG_SD_DIRECT_DMA) && !defined(CONFIG_HIGHMEM)
+ 	if ((tangox_inv_dma_address(addr) < CPHYSADDR(em8xxx_kmem_start)) || (tangox_inv_dma_address(addr) >= (CPHYSADDR(em8xxx_kmem_start) + em8xxx_kmem_size)))
+ 		printk("MBUS Warning (rectangle): bad transfer address 0x%08x\n", addr);
+ #endif
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/tangox/prom.c linux-2.6.29/arch/mips/tangox/prom.c
+--- linux-2.6.29.ref/arch/mips/tangox/prom.c	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/arch/mips/tangox/prom.c	2011-06-09 17:36:52.756434141 -0700
+@@ -30,6 +30,8 @@
+ unsigned long orig_cpu_freq;
+ unsigned long em8xxx_kmem_start;
+ unsigned long em8xxx_kmem_size;
++unsigned long em8xxx_himem_start;
++unsigned long em8xxx_himem_size;
+ unsigned long em8xxx_sys_clkgen_pll;
+ unsigned long em8xxx_sys_premux;
+ unsigned long em8xxx_sys_mux;
+@@ -42,6 +44,7 @@
+ int is_tango3_chip(void);
+ int is_tango3_es1(void);
+ int is_tango3_es2(void);
++void tangox_get_himem_info(unsigned long *start, unsigned long *size);
+ 
+ /*
+  * we will restore remap registers before rebooting
+@@ -365,6 +368,75 @@
+ 	return;
+ }
+ 
++#ifdef CONFIG_HIGHMEM
++static void __init tangox_himem_setup(unsigned long *start, unsigned long *size)
++{
++	unsigned long himem_ga = *start, himem_sz = *size, himem_end;
++	
++#ifdef CONFIG_TANGO3
++	int i;
++	unsigned long remap_ga, remap_sz, remap_end, kmem_sz;
++
++	if ((himem_ga == 0) || (himem_sz == 0))
++		return;
++	/* align highmem area to page boundary */
++	himem_ga = (himem_ga & PAGE_MASK) + ((himem_ga & ~PAGE_MASK) ? PAGE_SIZE : 0);
++	himem_end = (himem_ga + himem_sz) & PAGE_MASK;
++	if (himem_ga >= himem_end) 
++		goto no_highmem;
++
++	for (i = REMAP_IDX, kmem_sz = em8xxx_kmem_size; (kmem_sz > 0) && (i < 8); i++) {
++		remap_ga = em8xxx_remap_registers[i];
++		remap_sz = (kmem_sz >= 0x04000000UL) ? 0x04000000UL : kmem_sz;
++		remap_end = remap_ga + remap_sz;
++
++		/* if overlap found in remapped memory and highmem area, we need
++		   to adjust highmem area accordingly. */
++		if ((himem_ga >= remap_ga) && (himem_ga < remap_end))
++			himem_ga = remap_end;
++		if ((himem_end > remap_ga) && (himem_end <= remap_end))
++			himem_end = remap_ga;
++
++		if (himem_ga >= himem_end) 
++			goto no_highmem;
++		kmem_sz -= remap_sz;
++	}
++#else
++	memcfg_t *m = (memcfg_t *)KSEG1ADDR(MEM_BASE_dram_controller_0 + FM_MEMCFG);
++
++	if ((himem_ga == 0) || (himem_sz == 0))
++		return;
++	/* align highmem area to page boundary */
++	himem_ga = (himem_ga & PAGE_MASK) + ((himem_ga & ~PAGE_MASK) ? PAGE_SIZE : 0);
++	himem_end = (himem_ga + himem_sz) & PAGE_MASK;
++	if (himem_ga >= himem_end) 
++		goto no_highmem;
++
++	/* adjust highmem area to restrict it to DRAM1 only */
++	if (himem_ga < MEM_BASE_dram_controller_1)
++		himem_ga = MEM_BASE_dram_controller_1;
++	else if (himem_ga > MEM_BASE_dram_controller_1 + m->dram1_size) 
++		goto no_highmem;
++
++	if (himem_end > MEM_BASE_dram_controller_1 + m->dram1_size)
++		himem_end = MEM_BASE_dram_controller_1 + m->dram1_size;
++	else if (highmem_end < MEM_BASE_dram_controller_1) 
++		goto no_highmem;
++
++	if (himem_ga >= himem_end) 
++		goto no_highmem;
++#endif
++
++	*start = himem_ga;
++	*size = himem_end - himem_ga;
++	return;
++
++no_highmem:
++	*start = *size = 0; /* no highmem available */
++	return;
++}
++#endif
++
+ void __init prom_init(void)
+ {
+ 	extern char _text;
+@@ -574,6 +646,10 @@
+ #endif
+ 
+ 	tangox_mem_setup(em8xxx_kmem_size);
++#ifdef CONFIG_HIGHMEM
++	tangox_get_himem_info(&em8xxx_himem_start, &em8xxx_himem_size);
++	tangox_himem_setup(&em8xxx_himem_start, &em8xxx_himem_size);
++#endif
+ 
+ 	/*
+ 	 * tell kernel about available memory size/offset
+@@ -585,6 +661,12 @@
+ 	offset = KSEG1ADDR(em8xxx_kmem_start) - KSEG1ADDR(MEM_BASE_dram_controller_0);
+ 	add_memory_region(MEM_BASE_dram_controller_0 + offset, em8xxx_kmem_size, BOOT_MEM_RAM);
+ #endif
++#ifdef CONFIG_HIGHMEM
++	if ((em8xxx_himem_start != 0) && (em8xxx_himem_size != 0)) {
++		add_memory_region(em8xxx_himem_start, em8xxx_himem_size, BOOT_MEM_RAM);
++		printk("adding [0x%08lx..0x%08lx) as highmem area.\n", em8xxx_himem_start, em8xxx_himem_start + em8xxx_himem_size);
++	}
++#endif
+ 
+ 	arcs_cmdline[CL_SIZE - 1] = '\0';
+ #ifndef CONFIG_TANGOX_IGNORE_CMDLINE
+@@ -813,8 +895,8 @@
+ 
+ 	*physaddr = 0;
+ 	start_pg_addr = start & PAGE_MASK; /* address of start page */
+-	start_pg_offset = start & (PAGE_SIZE - 1); /* offset within start page */
+-	end_pg_addr = ((start + len) & PAGE_MASK) - (((start + len) & (PAGE_SIZE - 1)) ? 0 : PAGE_SIZE); /* address of last page */
++	start_pg_offset = start & ~PAGE_MASK; /* offset within start page */
++	end_pg_addr = ((start + len) & PAGE_MASK) - (((start + len) & ~PAGE_MASK) ? 0 : PAGE_SIZE); /* address of last page */
+ 
+ 	for (ppaddr = 0, pg_addr = start_pg_addr; pg_addr <= end_pg_addr; pg_addr += PAGE_SIZE) {
+ 		if (pg_addr > TASK_SIZE)
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/tangox/xenv_config.c linux-2.6.29/arch/mips/tangox/xenv_config.c
+--- linux-2.6.29.ref/arch/mips/tangox/xenv_config.c	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/arch/mips/tangox/xenv_config.c	2011-06-09 17:36:52.756434141 -0700
+@@ -196,6 +196,8 @@
+ static u32 isaide_irq = 0;
+ 
+ static u32 xenv_gbus_addr = 0;
++static u32 himem_ga = 0;
++static u32 himem_sz = 0;
+ 
+ /* mac address to use if xenv is not readable  */
+ static const u8 def_mac_address[6] = { 0x48, 0x4a, 0xe5, 0x00, 0x00, 0x01 };
+@@ -283,6 +285,9 @@
+ 	CHECK_AND_STORE(XENV_KEY_SATA_CHANNEL_CFG, 4, sata_channel_cfg);
+ #endif
+ 
++	CHECK_AND_STORE(XENV_KEY_HIMEM_GA, 4, himem_ga);
++	CHECK_AND_STORE(XENV_KEY_HIMEM_SZ, 4, himem_sz);
++
+ 	for (i = 0; i < 4; i++) {
+ 		int j;
+ 
+@@ -843,8 +848,18 @@
+ }
+ #endif
+ 
++void tangox_get_himem_info(unsigned long *start, unsigned long *size)
++{
++	*start = *size = 0;
++	if ((himem_ga != 0) && (himem_sz != 0)) {
++		*start = himem_ga;
++		*size = himem_sz;
++	}
++}
++
+ EXPORT_SYMBOL(tangox_ethernet_getmac);
+ EXPORT_SYMBOL(tangox_get_scard_info);
+ EXPORT_SYMBOL(tangox_get_ps_config);
+ EXPORT_SYMBOL(tangox_get_standby_config);
++EXPORT_SYMBOL(tangox_get_himem_info);
+ 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/tangox/xenvkeys.h linux-2.6.29/arch/mips/tangox/xenvkeys.h
+--- linux-2.6.29.ref/arch/mips/tangox/xenvkeys.h	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/arch/mips/tangox/xenvkeys.h	2011-06-09 17:36:52.770790278 -0700
+@@ -112,6 +112,9 @@
+ #define XENV_KEYS_CS_PART_SIZE      "l.cs%d_part%d_size"
+ #define XENV_KEYS_CS_PART_OFFSET    "l.cs%d_part%d_offset" 
+ 
++#define XENV_KEY_HIMEM_GA	    "l.himem_ga"
++#define XENV_KEY_HIMEM_SZ	    "l.himem_sz"
++
+ #if defined(CONFIG_TANGO3)
+ #define XENV_KEYS_CS_RSVD_PBLK	    "a.cs%d_rsvd_pblk"
+ #define XENV_KEY_SATA_CHANNEL_CFG   "a.sata_channel_cfg"
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/ata/sata_tangox.c linux-2.6.29/drivers/ata/sata_tangox.c
+--- linux-2.6.29.ref/drivers/ata/sata_tangox.c	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/drivers/ata/sata_tangox.c	2011-06-09 17:36:52.770790278 -0700
+@@ -432,17 +432,6 @@
+ 				}
+ 			}
+ 			spin_unlock_irqrestore(&hsdev->lock, flags);
+-			if (qc->dma_dir == DMA_FROM_DEVICE) {
+-				struct scatterlist *sg;
+-				unsigned int si;
+-				for_each_sg(qc->sg, sg, qc->n_elem, si) {
+-					unsigned long len, addr;
+-
+-					len = sg_dma_len(sg);
+-					addr = (unsigned long)sg_virt(sg);
+-					dma_cache_inv(addr, len);
+-				}
+-			}
+ 			dma_unmap_sg((struct device *)qc->dev, qc->sg, qc->n_elem, qc->dma_dir);
+ 
+ 			/* fall thru */
+@@ -1031,11 +1020,7 @@
+ 	if (dir==DMA_TO_DEVICE) {
+ 		unsigned int si;
+ 		for_each_sg(qc->sg, sg, qc->n_elem, si) {
+-			unsigned long len, addr;
+-			len = sg_dma_len(sg);
+-			addr = (unsigned long)sg_virt(sg);
+-			dma_cache_wback(addr, len);
+-			dev_dma_len += len;
++			dev_dma_len += sg_dma_len(sg);
+ 		}
+ 	} else
+ 		dev_dma_len = get_dma_len(qc);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mtd/nand/smp8xxx_nand.c linux-2.6.29/drivers/mtd/nand/smp8xxx_nand.c
+--- linux-2.6.29.ref/drivers/mtd/nand/smp8xxx_nand.c	2011-06-09 16:22:00.000000000 -0700
++++ linux-2.6.29/drivers/mtd/nand/smp8xxx_nand.c	2011-06-09 17:36:52.770790278 -0700
+@@ -44,6 +44,7 @@
+ #include <linux/mtd/nand.h>
+ #include <linux/mtd/nand_ecc.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/dma-mapping.h>
+ 
+ #include <asm/io.h>
+ 
+@@ -144,8 +145,9 @@
+ #define CS_DEVCFG	"a.cs%d_devcfg"
+ #define HIGH_32		"_hi"
+ 
+-/* Prototype of routine that gets XENV */
++/* Prototype of routine that gets XENV and others .. */
+ extern int zxenv_get(char *recordname, void *dst, u32 *datasize);
++extern unsigned long tangox_virt_to_phys(void *pvaddr);
+ 
+ /* Internal data structure */
+ static struct mtd_info smp8xxx_mtds[MAX_CS];
+@@ -278,6 +280,7 @@
+ #ifdef USE_AUTOPIO
+ 	unsigned int cs = ((struct chip_private *)this->priv)->cs;
+ 	unsigned long g_mbus_reg = 0;
++	dma_addr_t dma_addr;
+ 
+ 	if ((in_atomic()) || (len <= mtd->oobsize))
+ 		goto pio;
+@@ -286,13 +289,14 @@
+ 	else if (em86xx_mbus_alloc_dma(SBOX_IDEFLASH, 0, &g_mbus_reg, NULL, 0))
+ 		goto pio;
+ 
+-	dma_cache_wback_inv((unsigned long)buf, len);
++	dma_addr = dma_map_single(NULL, (void *)buf, len, DMA_TO_DEVICE);
++
+ 	gbus_write_reg32(REG_BASE_host_interface + PB_automode_control + 4, 0);
+ 	gbus_write_reg32(REG_BASE_host_interface + PB_automode_start_address, SMP8XXX_REG_DATA);
+ 	/* 22:nand 17:8bit width 16:DRAM to PB len:number of PB accesses */
+ 	gbus_write_reg32(REG_BASE_host_interface + PB_automode_control, (cs << 24) | (2 << 22) | (1 << 17) | (0 << 16) | len);
+ 	
+-	em86xx_mbus_setup_dma(g_mbus_reg, tangox_dma_address(virt_to_phys(buf)), len, pbi_mbus_intr, NULL, 1);
++	em86xx_mbus_setup_dma(g_mbus_reg, dma_addr, len, pbi_mbus_intr, NULL, 1);
+ 
+ 	wait_event_interruptible(mbus_wq, mbus_done != 0);
+ 	while (gbus_read_reg32(REG_BASE_host_interface + PB_automode_control) & 0xffff)
+@@ -300,6 +304,8 @@
+ 	mbus_done = 0;
+ 	
+ 	em86xx_mbus_free_dma(g_mbus_reg, SBOX_IDEFLASH);
++	dma_unmap_single(NULL, dma_addr, len, DMA_TO_DEVICE);
++
+ 	goto done;
+ 
+ pio:
+@@ -329,6 +335,7 @@
+ #ifdef USE_AUTOPIO
+ 	unsigned int cs = ((struct chip_private *)this->priv)->cs;
+ 	unsigned long g_mbus_reg = 0;
++	dma_addr_t dma_addr;
+ 
+ 	if ((in_atomic()) || (len <= mtd->oobsize))
+ 		goto pio;
+@@ -337,13 +344,14 @@
+ 	else if (em86xx_mbus_alloc_dma(SBOX_IDEFLASH, 1, &g_mbus_reg, NULL, 0))
+ 		goto pio;
+ 
+-	dma_cache_inv((unsigned long)buf, len);
++	dma_addr = dma_map_single(NULL, (void *)buf, len, DMA_FROM_DEVICE);
++
+ 	gbus_write_reg32(REG_BASE_host_interface + PB_automode_control + 4, 0);
+ 	gbus_write_reg32(REG_BASE_host_interface + PB_automode_start_address, SMP8XXX_REG_DATA);
+ 	/* 22:nand 17:8bit width 16:DRAM to PB len:number of PB accesses */
+ 	gbus_write_reg32(REG_BASE_host_interface + PB_automode_control, (cs << 24) | (2 << 22) | (1 << 17) | (1 << 16) | len);
+ 
+-	em86xx_mbus_setup_dma(g_mbus_reg, tangox_dma_address(virt_to_phys(buf)), len, pbi_mbus_intr, NULL, 1);
++	em86xx_mbus_setup_dma(g_mbus_reg, dma_addr, len, pbi_mbus_intr, NULL, 1);
+ 
+ 	wait_event_interruptible(mbus_wq, mbus_done != 0);
+ 	while (gbus_read_reg32(REG_BASE_host_interface + PB_automode_control) & 0xffff)
+@@ -351,6 +359,8 @@
+ 	mbus_done = 0;
+ 
+ 	em86xx_mbus_free_dma(g_mbus_reg, SBOX_IDEFLASH);
++	dma_unmap_single(NULL, dma_addr, len, DMA_FROM_DEVICE);
++
+ 	goto done;
+ pio:
+ #endif
+@@ -738,6 +748,7 @@
+ 	unsigned long g_mbus_reg = 0;
+ 	uint8_t *buf = buffer;
+ 	uint8_t *bbuf = ((struct chip_private *)chip->priv)->bbuf;
++	dma_addr_t dma_addr;
+ 
+ 	if ((in_atomic()) || (len <= mtd->oobsize))
+ 		return -EIO;
+@@ -751,7 +762,7 @@
+ 	if (em86xx_mbus_alloc_dma(sbox_tgt[cs], 1, &g_mbus_reg, NULL, 1) < 0)
+ 		return -EIO;
+ 
+-	dma_cache_inv((unsigned long)buf, len);
++	dma_addr = dma_map_single(NULL, (void *)buf, len, DMA_FROM_DEVICE);
+ 
+ 	// poll ready status
+ 	while ((RD_HOST_REG32(STATUS_REG(chx_reg[cs])) & 0x80000000) != (1 << 31))
+@@ -761,10 +772,10 @@
+ 	WR_HOST_REG32(FLASH_CMD(chx_reg[cs]), 0x1);
+ 
+ #ifdef USE_CTRLER_IRQ
+-	em86xx_mbus_setup_dma(g_mbus_reg, tangox_dma_address(virt_to_phys(buf)), len, callbacks[cs], NULL, 1);
++	em86xx_mbus_setup_dma(g_mbus_reg, dma_addr, len, callbacks[cs], NULL, 1);
+ 	wait_event_interruptible(*wqueues[cs], chx_mbus_done[cs] != 0);
+ #else
+-	em86xx_mbus_setup_dma(g_mbus_reg, tangox_dma_address(virt_to_phys(buf)), len, NULL, NULL, 1);
++	em86xx_mbus_setup_dma(g_mbus_reg, tangox_dma_address(tangox_virt_to_phys(buf)), len, NULL, NULL, 1);
+ #endif
+ 
+ 	// poll ready status
+@@ -775,6 +786,7 @@
+ #endif
+ 
+ 	em86xx_mbus_free_dma(g_mbus_reg, sbox_tgt[cs]);
++	dma_unmap_single(NULL, dma_addr, len, DMA_FROM_DEVICE);
+ 
+ 	if (buf == bbuf) {
+ 		/* copy back */
+@@ -802,6 +814,7 @@
+ 	unsigned long g_mbus_reg = 0;
+ 	uint8_t *buf = (uint8_t *)buffer;
+ 	uint8_t *bbuf = ((struct chip_private *)chip->priv)->bbuf;
++	dma_addr_t dma_addr;
+ 
+ 	if ((in_atomic()) || (len <= mtd->oobsize)) {
+ 		smp8xxx_nand_bug(mtd);
+@@ -822,7 +835,7 @@
+ 		return /* TODO: -EIO? */;
+ 	}
+ 
+-	dma_cache_wback_inv((unsigned long)buf, len);
++	dma_addr = dma_map_single(NULL, (void *)buf, len, DMA_TO_DEVICE);
+ 
+ 	// poll ready status
+ 	while ((RD_HOST_REG32(STATUS_REG(chx_reg[cs])) & 0x80000000) != (1 << 31))
+@@ -832,10 +845,10 @@
+ 	WR_HOST_REG32(FLASH_CMD(chx_reg[cs]), 0x2);
+ 
+ #ifdef USE_CTRLER_IRQ
+-	em86xx_mbus_setup_dma(g_mbus_reg, tangox_dma_address(virt_to_phys(buf)), len, callbacks[cs], NULL, 1);
++	em86xx_mbus_setup_dma(g_mbus_reg, dma_addr, len, callbacks[cs], NULL, 1);
+ 	wait_event_interruptible(*wqueues[cs], chx_mbus_done[cs] != 0);
+ #else
+-	em86xx_mbus_setup_dma(g_mbus_reg, tangox_dma_address(virt_to_phys(buf)), len, NULL, NULL, 1);
++	em86xx_mbus_setup_dma(g_mbus_reg, tangox_dma_address(tangox_virt_to_phys(buf)), len, NULL, NULL, 1);
+ #endif
+ 	// poll ready status
+ 	while ((RD_HOST_REG32(STATUS_REG(chx_reg[cs])) & 0x80000000) != (1 << 31))
+@@ -845,6 +858,7 @@
+ #endif
+ 
+ 	em86xx_mbus_free_dma(g_mbus_reg, sbox_tgt[cs]);
++	dma_unmap_single(NULL, dma_addr, len, DMA_TO_DEVICE);
+ 
+ 	return;
+ }
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/README.1034.highmem.patch linux-2.6.29/README.1034.highmem.patch
+--- linux-2.6.29.ref/README.1034.highmem.patch	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/README.1034.highmem.patch	2011-06-09 17:40:12.116432584 -0700
+@@ -0,0 +1,22 @@
++Feature:
++--------
++Supporting HIGHMEM with SMP8xxx chips.
++
++Prerequisite patch numbers:
++---------------------------
++0000
++1000
++1001
++1014
++1016
++
++Primary author:
++---------------
++YH Lin
++
++Related to which chip version SMP86xx xx=?
++-----------------------------------------
++all
++
++(linux patches) which CONFIG_... are provided:
++----------------------------------------------
