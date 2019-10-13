@@ -1,0 +1,35 @@
+This is the Sigma Designs distribution of the Linux kernel for the MIPS architecture.
+
+The kernel preparation process is Makefile driven. Type 'make' in the main directory
+to start preparing the kernel sources and follow the instructions.
+
+Note about the integration with the rootfs package
+==================================================
+The kernel source package is now integrated with the rootfs package and is able
+to interact with it in two distinct ways:
+
+ a) it can grab the rootfs image produced by the rootfs package and use that as
+    its initial RAM disk
+ b) it can install its modules into the rootfs package so that they make it to
+    the rootfs image
+
+For both interactions to be able to take place, the SMP86XX_ROOTFS_PATH 
+environment variable must be defined, and must point to the main directory of 
+the rootfs package.
+
+The easiest way to achieve that is by sourcing the 'rootfs-path.env' environment
+file, which is created very early in the main rootfs package directory. See the
+README in the rootfs package for more information about this.
+
+When this environment variable is defined and points to a valid place, two 
+things will happen:
+
+ a) when building any of 'all', 'vmlinux', 'vmlinux.bin', 'vmlinux.zbf', the 
+    rootfs image found in the main directory of the rootfs package will be
+    pulled and used as for the initrd image for the kernel.
+ b) then building the 'modules_install' target, the kernel modules and related
+    support files (such as modules.dep) will be installed in the correct 
+    directory under the customization directory (usually 'package/customize/source')
+    of the rootfs package. If customization is enabled in the rootfs package,
+    then the modules and support files will be present in the rootfs image.
+

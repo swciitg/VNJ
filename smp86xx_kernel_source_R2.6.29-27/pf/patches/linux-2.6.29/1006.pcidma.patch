@@ -1,0 +1,1483 @@
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/include/asm/dma-mapping.h linux-2.6.29/arch/mips/include/asm/dma-mapping.h
+--- linux-2.6.29.ref/arch/mips/include/asm/dma-mapping.h	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/arch/mips/include/asm/dma-mapping.h	2011-04-26 21:01:42.714059375 -0700
+@@ -78,4 +78,8 @@
+ 	dma_addr_t device_addr, size_t size);
+ #endif
+ 
++#ifdef CONFIG_TANGOX
++#define HAVE_ARCH_PCI_SET_DMA_MASK
++#endif
++
+ #endif /* _ASM_DMA_MAPPING_H */
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/include/asm/io.h linux-2.6.29/arch/mips/include/asm/io.h
+--- linux-2.6.29.ref/arch/mips/include/asm/io.h	2011-04-26 20:59:19.000000000 -0700
++++ linux-2.6.29/arch/mips/include/asm/io.h	2011-04-26 21:01:42.714059375 -0700
+@@ -381,7 +381,7 @@
+ 									\
+ 	war_octeon_io_reorder_wmb();					\
+ 									\
+-	__addr = (void *)__swizzle_addr_##bwlq(mips_io_port_base + port); \
++	__addr = (void *)(mips_io_port_base + __swizzle_addr_##bwlq(port)); \
+ 									\
+ 	__val = pfx##ioswab##bwlq(__addr, val);				\
+ 									\
+@@ -398,7 +398,7 @@
+ 	volatile type *__addr;						\
+ 	type __val;							\
+ 									\
+-	__addr = (void *)__swizzle_addr_##bwlq(mips_io_port_base + port); \
++	__addr = (void *)(mips_io_port_base + __swizzle_addr_##bwlq(port)); \
+ 									\
+ 	BUILD_BUG_ON(sizeof(type) > sizeof(unsigned long));		\
+ 									\
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/include/asm/tango2/tango2_pci.h linux-2.6.29/arch/mips/include/asm/tango2/tango2_pci.h
+--- linux-2.6.29.ref/arch/mips/include/asm/tango2/tango2_pci.h	2011-04-26 20:59:19.000000000 -0700
++++ linux-2.6.29/arch/mips/include/asm/tango2/tango2_pci.h	2011-04-26 21:01:42.714059375 -0700
+@@ -48,20 +48,19 @@
+ static inline int tangox_cfg_##pfx(void __iomem *addr, u32 *data)	\
+ {									\
+ 	unsigned long flags, status;					\
++	extern spinlock_t tangox_pci_lock;				\
+ 									\
+-	local_irq_save(flags);						\
++	spin_lock_irqsave(&tangox_pci_lock, flags);			\
+ 									\
+ 	__x;								\
+ 	status = (RD_HOST_REG8(PCI_host_reg2 + 3) >> 1) & 0x3;		\
+ 	if (status) {							\
+ 		WR_HOST_REG8(PCI_host_reg2 + 3, 1);			\
+ 		WR_HOST_REG8(PCI_host_reg2 + 3, 0);			\
+-		local_irq_restore(flags);				\
+-		return 1;						\
+ 	}								\
+ 									\
+-	local_irq_restore(flags);					\
+-	return 0;							\
++	spin_unlock_irqrestore(&tangox_pci_lock, flags);		\
++	return status ? 1 : 0;						\
+ }
+ 
+ BUILD_TANGOX_CFG_ACCESS(read8, *data = readb(addr) & 0xff)
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/include/asm/tango3/tango3_pci.h linux-2.6.29/arch/mips/include/asm/tango3/tango3_pci.h
+--- linux-2.6.29.ref/arch/mips/include/asm/tango3/tango3_pci.h	2011-04-26 20:59:19.000000000 -0700
++++ linux-2.6.29/arch/mips/include/asm/tango3/tango3_pci.h	2011-04-26 21:01:42.714059375 -0700
+@@ -48,20 +48,19 @@
+ static inline int tangox_cfg_##pfx(void __iomem *addr, u32 *data)	\
+ {									\
+ 	unsigned long flags, status;					\
++	extern spinlock_t tangox_pci_lock;				\
+ 									\
+-	local_irq_save(flags);						\
++	spin_lock_irqsave(&tangox_pci_lock, flags);			\
+ 									\
+ 	__x;								\
+ 	status = (RD_HOST_REG8(PCI_host_reg2 + 3) >> 1) & 0x3;		\
+ 	if (status) {							\
+ 		WR_HOST_REG8(PCI_host_reg2 + 3, 1);			\
+ 		WR_HOST_REG8(PCI_host_reg2 + 3, 0);			\
+-		local_irq_restore(flags);				\
+-		return 1;						\
+ 	}								\
+ 									\
+-	local_irq_restore(flags);					\
+-	return 0;							\
++	spin_unlock_irqrestore(&tangox_pci_lock, flags);		\
++	return status ? 1 : 0;						\
+ }
+ 
+ BUILD_TANGOX_CFG_ACCESS(read8, *data = readb(addr) & 0xff)
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/lib/iomap-pci.c linux-2.6.29/arch/mips/lib/iomap-pci.c
+--- linux-2.6.29.ref/arch/mips/lib/iomap-pci.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/arch/mips/lib/iomap-pci.c	2011-04-26 21:01:42.714059375 -0700
+@@ -10,12 +10,23 @@
+ #include <linux/module.h>
+ #include <asm/io.h>
+ 
++#ifdef CONFIG_TANGO2
++#include <asm/tango2/hardware.h>
++#elif defined(CONFIG_TANGO3)
++#include <asm/tango3/hardware.h>
++#endif
++
+ static void __iomem *ioport_map_pci(struct pci_dev *dev,
+                                      unsigned long port, unsigned int nr)
+ {
+ 	struct pci_controller *ctrl = dev->bus->sysdata;
+ 	unsigned long base = ctrl->io_map_base;
+ 
++#ifdef CONFIG_TANGOX
++	/* some quirk for TangoX */
++	port = (port >= MEMORY_BASE_PCI_IO) ? (port - MEMORY_BASE_PCI_IO) : port;
++#endif
++
+ 	/* This will eventually become a BUG_ON but for now be gentle */
+ 	if (unlikely(!ctrl->io_map_base)) {
+ 		struct pci_bus *bus = dev->bus;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/mm/dma-tangox.c linux-2.6.29/arch/mips/mm/dma-tangox.c
+--- linux-2.6.29.ref/arch/mips/mm/dma-tangox.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/arch/mips/mm/dma-tangox.c	2011-04-26 21:01:42.714059375 -0700
+@@ -0,0 +1,511 @@
++/*
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ *
++ * Copyright (C) 2000  Ani Joshi <ajoshi@unixbox.com>
++ * Copyright (C) 2000, 2001, 06  Ralf Baechle <ralf@linux-mips.org>
++ * swiped from i386, and cloned for MIPS by Geert, polished by Ralf.
++ */
++
++#include <linux/types.h>
++#include <linux/dma-mapping.h>
++#include <linux/mm.h>
++#include <linux/module.h>
++#include <linux/scatterlist.h>
++#include <linux/string.h>
++
++#include <asm/cache.h>
++#include <asm/io.h>
++
++//#include <dma-coherence.h>
++
++struct device;
++
++#ifdef CONFIG_TANGO2
++#include <asm/tango2/hardware.h>
++#elif defined(CONFIG_TANGO3)
++#include <asm/tango3/hardware.h>
++#endif
++
++extern unsigned long g_pcimem_busaddr;
++extern unsigned long g_pcimem_physaddr;
++extern unsigned long g_pcimem_physaddr_end;
++extern struct bus_type pci_bus_type;
++
++#ifdef CONFIG_PCI
++#define IS_PCIDEV(x)	(((x) != NULL) && ((x)->bus == &pci_bus_type))
++#else
++#define IS_PCIDEV(x)	0
++#endif
++
++#ifdef CONFIG_PCI
++static inline unsigned long __pci_virt_to_bus(unsigned long virt)
++{
++	unsigned long physaddr = CPHYSADDR(virt);
++	if ((physaddr < g_pcimem_physaddr) || (physaddr >= g_pcimem_physaddr_end)) {
++		printk("virt2bus: Not a dma-able address: 0x%08lx\n", virt);
++		return 0;
++	}
++	return((unsigned long)((physaddr - g_pcimem_physaddr) +
++			       g_pcimem_busaddr));
++}
++
++static inline unsigned long __pci_bus_to_virt(unsigned long busaddr)
++{
++	if ((busaddr < g_pcimem_busaddr) ||
++	    (busaddr >= (g_pcimem_busaddr + (g_pcimem_physaddr_end - g_pcimem_physaddr)))) {
++		printk("bus2virt: Not a valid bus address: 0x%08lx\n",
++		       busaddr);
++		return 0;
++	}
++	return((unsigned long)phys_to_virt((busaddr - g_pcimem_busaddr) +
++			       g_pcimem_physaddr));
++}
++#else
++static inline unsigned long __pci_virt_to_bus(unsigned long addr)
++{
++	BUG();
++	return 0;
++}
++
++static inline unsigned long __pci_bus_to_virt(unsigned long addr)
++{
++	BUG();
++	return 0;
++}
++#endif
++
++unsigned long pci_virt_to_bus(unsigned long addr)
++{
++	return __pci_virt_to_bus(addr);
++}
++
++EXPORT_SYMBOL(pci_virt_to_bus);
++
++unsigned long pci_bus_to_virt(unsigned long addr)
++{
++	return __pci_bus_to_virt(addr);
++}
++
++EXPORT_SYMBOL(pci_bus_to_virt);
++
++static inline dma_addr_t plat_map_dma_mem(struct device *dev, void *addr, size_t size)
++{
++	if (IS_PCIDEV(dev))
++		return __pci_virt_to_bus((unsigned long)addr);
++	return tangox_dma_address(virt_to_phys(addr));
++}
++
++static inline dma_addr_t plat_map_dma_mem_page(struct device *dev, struct page *page)
++{
++	if (IS_PCIDEV(dev))
++		return __pci_virt_to_bus((unsigned long)page_to_phys(page));
++	return tangox_dma_address(page_to_phys(page));
++}
++
++static inline unsigned long plat_dma_addr_to_phys(dma_addr_t dma_addr)
++{
++#ifdef CONFIG_PCI
++	if ((dma_addr >= g_pcimem_busaddr) &&
++	    (dma_addr < (g_pcimem_busaddr + (g_pcimem_physaddr_end - g_pcimem_physaddr)))) 
++		return((unsigned long)(dma_addr - g_pcimem_busaddr) + g_pcimem_physaddr);
++#endif
++	return tangox_inv_dma_address(dma_addr);
++}
++
++static inline void plat_unmap_dma_mem(struct device *dev, dma_addr_t dma_addr)
++{
++	/* nothing to be done */
++}
++
++static inline int plat_device_is_coherent(struct device *dev)
++{
++	return 0; /* Always noncoherent for Tango2/3/4 */
++}
++
++static inline unsigned long dma_addr_to_virt(dma_addr_t dma_addr)
++{
++	unsigned long addr = plat_dma_addr_to_phys(dma_addr);
++
++	return (unsigned long)phys_to_virt(addr);
++}
++
++static inline int plat_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
++{
++	return (dma_addr == 0) ? 1 : 0;
++}
++
++static inline int plat_dma_supported(struct device *dev, u64 mask)
++{
++	/* 
++         * we fall back to GFP_DMA when the mask isn't all 1s,
++         * so we can't guarantee allocations that must be
++         * within a tighter range than GFP_DMA..
++         */
++	if (mask < DMA_BIT_MASK(24))
++		return 0;
++	return 1;
++}
++
++static inline void plat_extra_sync_for_device(struct device *dev)
++{
++	return;
++}
++
++/*
++ * Warning on the terminology - Linux calls an uncached area coherent;
++ * MIPS terminology calls memory areas with hardware maintained coherency
++ * coherent.
++ */
++
++static inline int cpu_is_noncoherent_r10000(struct device *dev)
++{
++	return !plat_device_is_coherent(dev) &&
++	       (current_cpu_type() == CPU_R10000 ||
++	       current_cpu_type() == CPU_R12000);
++}
++
++static gfp_t massage_gfp_flags(const struct device *dev, gfp_t gfp)
++{
++	/* ignore region specifiers */
++	gfp &= ~(__GFP_DMA | __GFP_DMA32 | __GFP_HIGHMEM);
++
++#ifdef CONFIG_ZONE_DMA
++	if (dev == NULL)
++		gfp |= __GFP_DMA;
++	else if (dev->coherent_dma_mask < DMA_BIT_MASK(24))
++		gfp |= __GFP_DMA;
++	else
++#endif
++#ifdef CONFIG_ZONE_DMA32
++	     if (dev->coherent_dma_mask < DMA_BIT_MASK(32))
++		gfp |= __GFP_DMA32;
++	else
++#endif
++		;
++
++	/* Don't invoke OOM killer */
++	gfp |= __GFP_NORETRY;
++
++	return gfp;
++}
++
++void *dma_alloc_noncoherent(struct device *dev, size_t size,
++	dma_addr_t * dma_handle, gfp_t gfp)
++{
++	void *ret;
++
++	gfp = massage_gfp_flags(dev, gfp);
++
++	ret = (void *) __get_free_pages(gfp, get_order(size));
++
++	if (ret != NULL) {
++		memset(ret, 0, size);
++		*dma_handle = plat_map_dma_mem(dev, ret, size);
++	}
++
++	return ret;
++}
++
++EXPORT_SYMBOL(dma_alloc_noncoherent);
++
++void *dma_alloc_coherent(struct device *dev, size_t size,
++	dma_addr_t * dma_handle, gfp_t gfp)
++{
++	void *ret;
++
++	gfp = massage_gfp_flags(dev, gfp);
++
++	ret = (void *) __get_free_pages(gfp, get_order(size));
++
++	if (ret) {
++		memset(ret, 0, size);
++		*dma_handle = plat_map_dma_mem(dev, ret, size);
++
++		if (!plat_device_is_coherent(dev)) {
++			dma_cache_wback_inv((unsigned long) ret, size);
++			ret = UNCAC_ADDR(ret);
++		}
++	}
++
++	return ret;
++}
++
++EXPORT_SYMBOL(dma_alloc_coherent);
++
++void dma_free_noncoherent(struct device *dev, size_t size, void *vaddr,
++	dma_addr_t dma_handle)
++{
++	plat_unmap_dma_mem(dev, dma_handle);
++	free_pages((unsigned long) vaddr, get_order(size));
++}
++
++EXPORT_SYMBOL(dma_free_noncoherent);
++
++void dma_free_coherent(struct device *dev, size_t size, void *vaddr,
++	dma_addr_t dma_handle)
++{
++	unsigned long addr = (unsigned long) vaddr;
++
++	plat_unmap_dma_mem(dev, dma_handle);
++
++	if (!plat_device_is_coherent(dev))
++		addr = CAC_ADDR(addr);
++
++	free_pages(addr, get_order(size));
++}
++
++EXPORT_SYMBOL(dma_free_coherent);
++
++static inline void __dma_sync(unsigned long addr, size_t size,
++	enum dma_data_direction direction)
++{
++	switch (direction) {
++	case DMA_TO_DEVICE:
++		dma_cache_wback(addr, size);
++		break;
++
++	case DMA_FROM_DEVICE:
++		dma_cache_inv(addr, size);
++		break;
++
++	case DMA_BIDIRECTIONAL:
++		dma_cache_wback_inv(addr, size);
++		break;
++
++	default:
++		BUG();
++	}
++}
++
++dma_addr_t dma_map_single(struct device *dev, void *ptr, size_t size,
++	enum dma_data_direction direction)
++{
++	unsigned long addr = (unsigned long) ptr;
++
++	if (!plat_device_is_coherent(dev))
++		__dma_sync(addr, size, direction);
++
++	return plat_map_dma_mem(dev, ptr, size);
++}
++
++EXPORT_SYMBOL(dma_map_single);
++
++void dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
++	enum dma_data_direction direction)
++{
++	if (cpu_is_noncoherent_r10000(dev))
++		__dma_sync(dma_addr_to_virt(dma_addr), size,
++		           direction);
++
++	plat_unmap_dma_mem(dev, dma_addr);
++}
++
++EXPORT_SYMBOL(dma_unmap_single);
++
++int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
++	enum dma_data_direction direction)
++{
++	int i;
++
++	BUG_ON(direction == DMA_NONE);
++
++	for (i = 0; i < nents; i++, sg++) {
++		unsigned long addr;
++
++		addr = (unsigned long) sg_virt(sg);
++		if (!plat_device_is_coherent(dev) && addr)
++			__dma_sync(addr, sg->length, direction);
++		sg->dma_address = plat_map_dma_mem(dev,
++				                   (void *)addr, sg->length);
++	}
++
++	return nents;
++}
++
++EXPORT_SYMBOL(dma_map_sg);
++
++dma_addr_t dma_map_page(struct device *dev, struct page *page,
++	unsigned long offset, size_t size, enum dma_data_direction direction)
++{
++	BUG_ON(direction == DMA_NONE);
++
++	if (!plat_device_is_coherent(dev)) {
++		unsigned long addr;
++
++		addr = (unsigned long) page_address(page) + offset;
++		dma_cache_wback_inv(addr, size);
++	}
++
++	return plat_map_dma_mem_page(dev, page) + offset;
++}
++
++EXPORT_SYMBOL(dma_map_page);
++
++void dma_unmap_page(struct device *dev, dma_addr_t dma_address, size_t size,
++	enum dma_data_direction direction)
++{
++	BUG_ON(direction == DMA_NONE);
++
++	if (!plat_device_is_coherent(dev) && direction != DMA_TO_DEVICE) {
++		unsigned long addr;
++
++		addr = dma_addr_to_virt(dma_address);
++		dma_cache_wback_inv(addr, size);
++	}
++
++	plat_unmap_dma_mem(dev, dma_address);
++}
++
++EXPORT_SYMBOL(dma_unmap_page);
++
++void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
++	enum dma_data_direction direction)
++{
++	unsigned long addr;
++	int i;
++
++	BUG_ON(direction == DMA_NONE);
++
++	for (i = 0; i < nhwentries; i++, sg++) {
++		if (!plat_device_is_coherent(dev) &&
++		    direction != DMA_TO_DEVICE) {
++			addr = (unsigned long) sg_virt(sg);
++			if (addr)
++				__dma_sync(addr, sg->length, direction);
++		}
++		plat_unmap_dma_mem(dev, sg->dma_address);
++	}
++}
++
++EXPORT_SYMBOL(dma_unmap_sg);
++
++void dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle,
++	size_t size, enum dma_data_direction direction)
++{
++	BUG_ON(direction == DMA_NONE);
++
++	if (cpu_is_noncoherent_r10000(dev)) {
++		unsigned long addr;
++
++		addr = dma_addr_to_virt(dma_handle);
++		__dma_sync(addr, size, direction);
++	}
++}
++
++EXPORT_SYMBOL(dma_sync_single_for_cpu);
++
++void dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle,
++	size_t size, enum dma_data_direction direction)
++{
++	BUG_ON(direction == DMA_NONE);
++
++	plat_extra_sync_for_device(dev);
++	if (!plat_device_is_coherent(dev)) {
++		unsigned long addr;
++
++		addr = dma_addr_to_virt(dma_handle);
++		__dma_sync(addr, size, direction);
++	}
++}
++
++EXPORT_SYMBOL(dma_sync_single_for_device);
++
++void dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
++	unsigned long offset, size_t size, enum dma_data_direction direction)
++{
++	BUG_ON(direction == DMA_NONE);
++
++	if (cpu_is_noncoherent_r10000(dev)) {
++		unsigned long addr;
++
++		addr = dma_addr_to_virt(dma_handle);
++		__dma_sync(addr + offset, size, direction);
++	}
++}
++
++EXPORT_SYMBOL(dma_sync_single_range_for_cpu);
++
++void dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
++	unsigned long offset, size_t size, enum dma_data_direction direction)
++{
++	BUG_ON(direction == DMA_NONE);
++
++	plat_extra_sync_for_device(dev);
++	if (!plat_device_is_coherent(dev)) {
++		unsigned long addr;
++
++		addr = dma_addr_to_virt(dma_handle);
++		__dma_sync(addr + offset, size, direction);
++	}
++}
++
++EXPORT_SYMBOL(dma_sync_single_range_for_device);
++
++void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
++	enum dma_data_direction direction)
++{
++	int i;
++
++	BUG_ON(direction == DMA_NONE);
++
++	/* Make sure that gcc doesn't leave the empty loop body.  */
++	for (i = 0; i < nelems; i++, sg++) {
++		if (cpu_is_noncoherent_r10000(dev))
++			__dma_sync((unsigned long)page_address(sg_page(sg)),
++			           sg->length, direction);
++	}
++}
++
++EXPORT_SYMBOL(dma_sync_sg_for_cpu);
++
++void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nelems,
++	enum dma_data_direction direction)
++{
++	int i;
++
++	BUG_ON(direction == DMA_NONE);
++
++	/* Make sure that gcc doesn't leave the empty loop body.  */
++	for (i = 0; i < nelems; i++, sg++) {
++		if (!plat_device_is_coherent(dev))
++			__dma_sync((unsigned long)page_address(sg_page(sg)),
++			           sg->length, direction);
++	}
++}
++
++EXPORT_SYMBOL(dma_sync_sg_for_device);
++
++int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
++{
++	return plat_dma_mapping_error(dev, dma_addr);
++}
++
++EXPORT_SYMBOL(dma_mapping_error);
++
++int dma_supported(struct device *dev, u64 mask)
++{
++	return plat_dma_supported(dev, mask);
++}
++
++EXPORT_SYMBOL(dma_supported);
++
++int dma_is_consistent(struct device *dev, dma_addr_t dma_addr)
++{
++	return plat_device_is_coherent(dev);
++}
++
++EXPORT_SYMBOL(dma_is_consistent);
++
++void dma_cache_sync(struct device *dev, void *vaddr, size_t size,
++	       enum dma_data_direction direction)
++{
++	BUG_ON(direction == DMA_NONE);
++
++	plat_extra_sync_for_device(dev);
++	if (!plat_device_is_coherent(dev))
++		__dma_sync((unsigned long)vaddr, size, direction);
++}
++
++EXPORT_SYMBOL(dma_cache_sync);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/mm/Makefile linux-2.6.29/arch/mips/mm/Makefile
+--- linux-2.6.29.ref/arch/mips/mm/Makefile	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/arch/mips/mm/Makefile	2011-04-26 21:01:42.714059375 -0700
+@@ -2,7 +2,7 @@
+ # Makefile for the Linux/MIPS-specific parts of the memory manager.
+ #
+ 
+-obj-y				+= cache.o dma-default.o extable.o fault.o \
++obj-y				+= cache.o extable.o fault.o \
+ 				   init.o tlbex.o tlbex-fault.o uasm.o page.o
+ 
+ obj-$(CONFIG_32BIT)		+= ioremap.o pgtable-32.o
+@@ -34,4 +34,10 @@
+ obj-$(CONFIG_RM7000_CPU_SCACHE)	+= sc-rm7k.o
+ obj-$(CONFIG_MIPS_CPU_SCACHE)	+= sc-mips.o
+ 
++ifdef CONFIG_DMA_TANGOX
++obj-y   += dma-tangox.o
++else
++obj-y   += dma-default.o
++endif
++
+ EXTRA_CFLAGS += -Werror
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/pci/fixup-tangox.c linux-2.6.29/arch/mips/pci/fixup-tangox.c
+--- linux-2.6.29.ref/arch/mips/pci/fixup-tangox.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/arch/mips/pci/fixup-tangox.c	2011-04-26 21:01:42.714059375 -0700
+@@ -0,0 +1,59 @@
++
++/*********************************************************************
++ Copyright (C) 2001-2007
++ Sigma Designs, Inc. 
++ *********************************************************************/
++
++/*
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
++ */
++
++#include <linux/types.h>
++#include <linux/pci.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/delay.h>
++
++#ifdef CONFIG_TANGO2
++#include <asm/tango2/hardware.h>
++#include <asm/tango2/tango2_pci.h>
++#elif defined(CONFIG_TANGO3)
++#include <asm/tango3/hardware.h>
++#include <asm/tango3/tango3_pci.h>
++#endif
++
++extern int tangox_pcidev_irq_map(int pci_idsel, int int_num);
++
++int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
++{
++	/* return xenv config */
++	return tangox_pcidev_irq_map(slot, pin);
++}
++
++int pcibios_plat_dev_init(struct pci_dev *dev)
++{
++	return 0;
++}
++
++/*
++ * final fixup for our pci bus, called after all resource allocation.
++ */
++static void tangox_fixup(struct pci_dev *dev)
++{
++	dev->dev.platform_data = 0;
++}
++
++DECLARE_PCI_FIXUP_FINAL(PCI_ANY_ID, PCI_ANY_ID, tangox_fixup);
++
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/pci/Makefile linux-2.6.29/arch/mips/pci/Makefile
+--- linux-2.6.29.ref/arch/mips/pci/Makefile	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/arch/mips/pci/Makefile	2011-04-26 21:01:42.714059375 -0700
+@@ -52,3 +52,5 @@
+ obj-$(CONFIG_ZAO_CAPCELLA)	+= fixup-capcella.o
+ obj-$(CONFIG_WR_PPMC)		+= fixup-wrppmc.o
+ obj-$(CONFIG_MIKROTIK_RB532)	+= pci-rc32434.o ops-rc32434.o fixup-rc32434.o
++obj-$(CONFIG_TANGOX)		+= pci-tangox.o fixup-tangox.o ops-tangox.o
++
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/pci/ops-tangox.c linux-2.6.29/arch/mips/pci/ops-tangox.c
+--- linux-2.6.29.ref/arch/mips/pci/ops-tangox.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/arch/mips/pci/ops-tangox.c	2011-04-26 21:01:42.714059375 -0700
+@@ -0,0 +1,135 @@
++
++/*********************************************************************
++ Copyright (C) 2001-2007
++ Sigma Designs, Inc. 
++ *********************************************************************/
++
++/*
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
++ */
++
++#include <linux/types.h>
++#include <linux/pci.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++
++#include <asm/io.h>
++#ifdef CONFIG_TANGO2
++#include <asm/tango2/tango2_pci.h>
++#elif defined(CONFIG_TANGO3)
++#include <asm/tango3/tango3_pci.h>
++#endif
++
++/*
++ * remapped address to access config space from kernel
++ */
++void __iomem *tangox_pci_config_base;
++
++/*
++ * list of devices for which we allow configuration access
++ */
++int enabled_devices[PCIEM86XX_IDSEL_MAX];
++
++/*
++ * find cfg address to use for given bus/device/Address
++ */
++#define CFG_ADDR(bus,devfn,where)	\
++	(tangox_pci_config_base + (((bus) << 16) + ((devfn) << 8) + (where)))
++
++/*
++ * read/write callbacks for pci configuration memory access
++ */
++int tangox_pcibios_read(struct pci_bus *bus, unsigned int devfn,
++			int where, int size, u32 *val)
++{
++	void __iomem *addr = CFG_ADDR(bus->number, devfn, where);
++	int ret, slot;
++
++	slot = PCI_SLOT(devfn);
++
++	/*
++	 * check that it is ok to use this slot
++	 */
++	if (!enabled_devices[slot] || slot >= PCIEM86XX_IDSEL_MAX)
++		return PCIBIOS_DEVICE_NOT_FOUND;
++
++	/*
++	 * reject silly sizes
++	 */
++	if ((size == 2) && (where & 1))
++		return PCIBIOS_BAD_REGISTER_NUMBER;
++	else if ((size == 4) && (where & 3))
++		return PCIBIOS_BAD_REGISTER_NUMBER;
++
++	switch (size) {
++	case 1:
++		ret = tangox_cfg_read8(addr, val);
++		break;
++
++	case 2:
++		ret = tangox_cfg_read16(addr, val);
++		break;
++
++	default:
++		ret = tangox_cfg_read32(addr, val);
++		break;
++	}
++
++	return ret;
++}
++
++int tangox_pcibios_write(struct pci_bus *bus, unsigned int devfn,
++			 int where, int size, u32 val)
++{
++	void __iomem *addr = CFG_ADDR(bus->number, devfn, where);
++	int ret, slot;
++
++	slot = PCI_SLOT(devfn);
++
++	/*
++	 * check that it is ok to use this slot
++	 */
++	if (!enabled_devices[slot] || slot >= PCIEM86XX_IDSEL_MAX)
++		return PCIBIOS_DEVICE_NOT_FOUND;
++
++	/*
++	 * reject silly sizes
++	 */
++	if ((size == 2) && (where & 1))
++		return PCIBIOS_BAD_REGISTER_NUMBER;
++	else if ((size == 4) && (where & 3))
++		return PCIBIOS_BAD_REGISTER_NUMBER;
++
++	switch (size) {
++	case 1:
++		ret = tangox_cfg_write8(addr, &val);
++		break;
++
++	case 2:
++		ret = tangox_cfg_write16(addr, &val);
++		break;
++
++	default:
++		ret = tangox_cfg_write32(addr, &val);
++		break;
++	}
++
++	return ret;
++}
++
++struct pci_ops tangox_pci_ops = {
++	.read = tangox_pcibios_read,
++	.write = tangox_pcibios_write,
++};
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/pci/pci.c linux-2.6.29/arch/mips/pci/pci.c
+--- linux-2.6.29.ref/arch/mips/pci/pci.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/arch/mips/pci/pci.c	2011-04-26 21:01:42.714059375 -0700
+@@ -358,8 +358,14 @@
+ 
+ char * (*pcibios_plat_setup)(char *str) __devinitdata;
+ 
++int pci_enabled = 1;
++
+ char *__devinit pcibios_setup(char *str)
+ {
++	if (strcmp(str, "disabled") == 0) {
++		pci_enabled = 0;
++		return(NULL);
++	}
+ 	if (pcibios_plat_setup)
+ 		return pcibios_plat_setup(str);
+ 	return str;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/pci/pci-tangox.c linux-2.6.29/arch/mips/pci/pci-tangox.c
+--- linux-2.6.29.ref/arch/mips/pci/pci-tangox.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/arch/mips/pci/pci-tangox.c	2011-04-26 21:01:42.714059375 -0700
+@@ -0,0 +1,451 @@
++
++/*********************************************************************
++ Copyright (C) 2001-2007
++ Sigma Designs, Inc. 
++ *********************************************************************/
++
++/*
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
++ */
++
++#include <linux/types.h>
++#include <linux/pci.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++
++#include <asm/pci.h>
++#include <asm/dma.h>
++
++#ifdef CONFIG_TANGO2
++#include <asm/tango2/tango2_gbus.h>
++#include <asm/tango2/hardware.h>
++#include <asm/tango2/tango2_pci.h>
++#elif defined(CONFIG_TANGO3)
++#include <asm/tango3/tango3_gbus.h>
++#include <asm/tango3/hardware.h>
++#include <asm/tango3/tango3_pci.h>
++#endif
++
++#include <asm/cacheflush.h>
++
++/*
++ * computed in prom.c
++ */
++extern unsigned long em8xxx_kmem_start;
++extern unsigned long em8xxx_kmem_size;
++
++/*
++ * pci addresses used by dma subsystem
++ */
++unsigned long g_pcimem_busaddr;
++unsigned long g_pcimem_physaddr;
++unsigned long g_pcimem_physaddr_end;
++
++DEFINE_SPINLOCK(tangox_pci_lock);
++EXPORT_SYMBOL(tangox_pci_lock);
++
++void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long maxlen);
++//void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
++unsigned char *__unused_ptr1__ = (unsigned char *)pci_iomap;
++//unsigned char *__unused_ptr2__ = (unsigned char *)pci_iounmap;
++
++/*
++ * We can't  touch iospace directly from  kseg1, we need  to remap it.
++ * No  need to  remap too  much space,  only 256  bytes per  device is
++ * allowed, so 64k should be more than enough.
++ */
++#define MEMORY_SIZE_PCI_IO			(64 * 1024)
++
++static struct resource tangox_pci_io_resource = {
++	.name   = "tangox pci IO space",
++ 	.start  = MEMORY_BASE_PCI_IO,
++ 	.end    = MEMORY_BASE_PCI_IO + MEMORY_SIZE_PCI_IO - 1,
++	.flags  = IORESOURCE_IO
++};
++
++/*
++ * give 512MB for PCI memory space
++ */
++static struct resource tangox_pci_mem_resource = {
++        .name   = "tangox pci memory space",
++        .start  = MEMORY_BASE_PCI_MEMORY + 0x02000000, /* from 32MB offset */
++        .end    = MEMORY_BASE_PCI_MEMORY + 0x1fffffff,
++        .flags  = IORESOURCE_MEM
++};
++
++
++/*
++ * Need to  remap config  space to access  it from kernel.   Note that
++ * remap size is just enough for PCIEM86XX_IDSEL_MAX devices on 1 bus.
++ */
++#define MEMORY_SIZE_PCI_CONFIG	(PCIEM86XX_IDSEL_MAX * (1 << 11))
++
++/*
++ * in ops-tangox.c
++ */
++extern void __iomem *tangox_pci_config_base;
++extern struct pci_ops tangox_pci_ops;
++extern int enabled_devices[PCIEM86XX_IDSEL_MAX];
++
++struct pci_controller tangox_controller = {
++        .pci_ops        = &tangox_pci_ops,
++        .io_resource    = &tangox_pci_io_resource,
++        .mem_resource   = &tangox_pci_mem_resource,
++
++	/*
++	 * gbus  addresses are  not the  same as  pci  addresses, tell
++	 * Linux about this so it can adjust resource addresses.
++	 */
++	.mem_offset	= MEMORY_BASE_PCI_MEMORY,
++	.io_offset	= MEMORY_BASE_PCI_CONFIG,
++};
++
++/*
++ * helpers to access host interface registers
++ */
++#define RD_HOST_REG32(r)	\
++		gbus_read_reg32(REG_BASE_host_interface + (r))
++
++#define WR_HOST_REG32(r, v)	\
++		gbus_write_reg32(REG_BASE_host_interface + (r), (v))
++
++#define RD_HOST_REG8(r)	\
++		gbus_read_reg8(REG_BASE_host_interface + (r))
++
++#define WR_HOST_REG8(r, v)	\
++		gbus_write_reg8(REG_BASE_host_interface + (r), (v))
++
++
++/*
++ * This is the  interrupt handler for bus fault  interrupt. Just clear
++ * it and warn user
++ */
++static irqreturn_t pci_busfault_intr(int irq, void *devinfo)
++{
++	static const char *reasons[] = {
++		"OK", "Master Abort", "Retry timer expired", "Unknown" };
++	static int faultcount = 0;
++	unsigned int data;
++
++	data = (RD_HOST_REG8(PCI_host_reg2 + 3) >> 1) & 3;
++	WR_HOST_REG8(PCI_host_reg2 + 3, 1);
++	WR_HOST_REG8(PCI_host_reg2 + 3, 0);
++
++	/* don't flood */
++	if (printk_ratelimit())
++		printk("PCI: PCI bus fault (count %d): %s\n",
++		       ++faultcount, reasons[data]);
++
++	return IRQ_HANDLED;
++}
++
++/*
++ * platform initialization code
++ */
++extern int tangox_pci_host_enabled(void);
++extern int tangox_pcidev_enabled(int idsel);
++extern unsigned long tangox_chip_id(void);
++
++/* can turned on/off by XENV or cmd line */
++extern int pci_enabled; 
++
++/* Status of PCI host */
++static int pci_active = 0;
++
++/* the maximum idsel */
++static int pci_idsel_max = PCIEM86XX_IDSEL_MAX;
++
++static int __init tangox_pci_init(void)
++{
++	void __iomem *pci_io_base;
++	unsigned long memsize, regsize, membase, max_dma_size;
++	u32 data;
++	int i;
++#if defined(CONFIG_TANGO3)
++	u32 pf = 0;
++#endif
++
++	/* don't do anything if pci support is not enabled in xenv nor is it by cmd line */
++	if (!pci_enabled) {
++		return 0;
++	} else if (!tangox_pci_host_enabled()) {
++		printk(KERN_NOTICE "PCI: pci host support disabled\n");
++		return 0;
++	} 
++
++	if (((tangox_chip_id() >> 16) & 0xfff0) == 0x8650)
++		pci_idsel_max--; /* one less for 865x */
++
++	printk("PCI: Initializing SMP8xxx PCI host controller\n");
++
++	/*
++	 * Enable pci host support
++	 */
++	WR_HOST_REG32(PCI_chip_is_host, 0); /* Reset PCI host */
++	udelay(1000);
++	WR_HOST_REG32(PCI_chip_is_host, 1);
++
++	/*
++	 * HOST_REG1 :
++	 * [31:16] : # of PCI retry cycle = 0xffff (default = 0xff)
++	 * [8] : host Super Request = 0
++	 * [3:0] arbitration level = 0x00 (Level 1)
++	 */
++	WR_HOST_REG32(PCI_host_reg1, 0xffff0000 | PCIEM86XX_ARBITER_LEVEL);
++
++	/*
++	 * PCI_CTRL1 :
++	 * [17] : enable "Memory Read Multiple" and "Memory Read Line"
++	 * [16] [7:0] : enable "prefetch" for PCI slave regions 2..7
++	 * [17] : Always enabled
++	 * [18] : additional bit for Tango. Long PCI memory read burst
++	 */
++	WR_HOST_REG32(PCI_pcictrl_reg1, 0x00030000);
++
++	/*
++	 * PCI_CTRL2 :
++	 * [18] : fast back-to-back capable = 0 (default)
++	 * [17] : read FIFO level = 1 (8 level deep, default)
++	 * [16] : discard timer enable = 1 (default)
++	 * [15:8] : subs latency = 0x06 (default = 0x08)
++	 * [7:0] : initial latency = 0x0d (default = 0x0b)
++	 */
++	WR_HOST_REG32(PCI_pcictrl_reg2, 0x0003060d);
++
++	/*
++	 * PCI_CTRL3 :
++	 * [16] : slave abort clear = 0
++	 * [10:8] : abort interrupt enable = 0 (default)
++	 * [2:0] : abort status = 0
++	 */
++	WR_HOST_REG32(PCI_pcictrl_reg3, 0);
++
++	/* clear any pending PCI bus fault */
++	if ((RD_HOST_REG8(PCI_host_reg2 + 3) >> 1) & 0x3) {
++		WR_HOST_REG8(PCI_host_reg2 + 3, 1);
++		WR_HOST_REG8(PCI_host_reg2 + 3, 0);
++	}
++
++	/* Setting pci_configuration_vld */
++	WR_HOST_REG8(PCI_host_reg2 + 2, 1);
++
++	/* grant timeout */
++	WR_HOST_REG32(PCI_host_reg3, PCIEM86XX_ARBITER_GRANTTIMEOUT);
++	WR_HOST_REG32(PCI_host_reg5,
++		      PCIEM86XX_ARBITER_GRANTTIMEOUT & 0x000000ff);
++
++	/* initialize arbiter */
++	WR_HOST_REG32(PCI_host_reg4, 0);
++
++	/*
++	 * remap iorange and give port base to linux.
++	 */
++	pci_io_base = ioremap(MEMORY_BASE_PCI_IO, MEMORY_SIZE_PCI_IO);
++	set_io_port_base((unsigned long)pci_io_base - MEMORY_BASE_PCI_IO);
++
++	tangox_controller.io_map_base = (unsigned long)pci_io_base;
++
++	printk("PCI: Remapped PCI I/O space 0x%08lx to 0x%p, size %u kB\n",
++	       MEMORY_BASE_PCI_IO, pci_io_base, MEMORY_SIZE_PCI_IO / 1024);
++
++	/*
++	 * remap configuration space also
++	 */
++	tangox_pci_config_base = ioremap(MEMORY_BASE_PCI_CONFIG,
++					 MEMORY_SIZE_PCI_CONFIG);
++
++	printk("PCI: Remapped PCI config space 0x%08lx to 0x%p, size %u kB\n",
++	       MEMORY_BASE_PCI_CONFIG, tangox_pci_config_base,
++	       MEMORY_SIZE_PCI_CONFIG / 1024);
++
++	memset(&enabled_devices, 0, sizeof (enabled_devices));
++	for (i = 1; i < pci_idsel_max; i++) {
++		if (tangox_pcidev_enabled(i)) {
++			enabled_devices[i] = 1;
++		} else {
++			printk("PCI: device %d disabled\n", i);
++		}
++	}
++
++	/*
++	 * check that we can probe the EM8XXX at id 0
++	 */
++	if (tangox_cfg_read32(tangox_pci_config_base, &data)) {
++		printk("PCI: Can't initialize EM86XX as a PCI slave\n");
++		memset(&enabled_devices, 0, sizeof (enabled_devices));
++		return 1;
++	}
++
++	/*
++	 * configure it as a PCI slave
++	 *
++	 * set PCI memory size to maximum, so the PCI memory will cover the
++	 * whole memory if the total DRAM size is smaller than 112MB/448MB (Tango2/Tango3).
++	 * For Tango2, maximum = 128MB => 16MB per region => DMA memory = 16 * 7 = 112MB
++	 * For Tango3, maximum = 512MB => 64MB per region => DMA memory = 64 * 7 = 448MB
++	 */
++	WR_HOST_REG8(PCI_REG3, MAX_LOG2_PCIMEM_MAP);
++
++	memsize = RD_HOST_REG32(PCI_REG3) & 0x07;
++
++#ifdef CONFIG_TANGO2
++	memsize = 1 << memsize;  /* from 1MB to 128MB */
++#elif defined(CONFIG_TANGO3)
++	memsize = 1 << (memsize + 3); /* from 8MB to 1024MB */
++#else
++#error Unsupported chip!
++#endif
++
++	/* get memory size in bytes / 8 */
++	regsize = (memsize << 20) >> 3; /* regsize in MB */
++
++	/* pci command */
++	__raw_writew(PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER,
++		     (void *)(tangox_pci_config_base + PCI_COMMAND));
++
++	/* base address 0 */
++	g_pcimem_busaddr = PCIBIOS_MIN_MEM_EM86XX - MEMORY_BASE_PCI_MEMORY;
++	__raw_writel(g_pcimem_busaddr,
++		     (void *)(tangox_pci_config_base + PCI_BASE_ADDRESS_0));
++
++	/*
++	 * PCI slave access
++	 * region 0 (R) : Configuration area
++	 * region 1 - 7: mapped to DRAM starting from DRAM_BASE */
++	g_pcimem_busaddr += (regsize * 1);
++	printk("PCI: Configured SMP8xxx as PCI slave with %ldMB "
++	       "PCI memory\n", memsize);
++	membase = CPHYSADDR(em8xxx_kmem_start);
++	max_dma_size = (unsigned long)MAX_DMA_ADDRESS - em8xxx_kmem_start;
++	g_pcimem_physaddr = membase;
++	g_pcimem_physaddr_end = g_pcimem_physaddr + em8xxx_kmem_size;
++
++	for (i = 1; (i < 8) && (max_dma_size > 0); ++i) {
++		/* PCI region base registers should contain low address */
++		WR_HOST_REG32(PCI_REGION_0_BASE + (i * 4), tangox_dma_address(CPHYSADDR(membase)));
++		membase += regsize; 
++		max_dma_size -= regsize;
++#if defined(CONFIG_TANGO3)
++		pf |= (1 << i);
++#endif
++		if ((regsize * i) >= em8xxx_kmem_size) {
++			++i;
++			break;
++		}
++	}
++	for (; i < 8; ++i) /* park the unused region to 0 */
++		WR_HOST_REG32(PCI_REGION_0_BASE + (i * 4), 0);
++
++#if defined(CONFIG_TANGO3)
++	/* Set up pre-fetchable regions */
++	WR_HOST_REG32(PCI_pcictrl_reg1, 0x00030000 | pf);
++	/* increase gbus bandwidth */
++	gbus_write_reg32(REG_BASE_system_block + 0x138, 0x00a0803f);
++#endif
++
++	if (g_pcimem_physaddr_end > membase)
++		g_pcimem_physaddr_end = membase;
++        printk("PCI: Region size is %ldKB\n", regsize >> 10);
++        printk("PCI: Map DMA memory 0x%08lx-0x%08lx for PCI at 0x%08lx\n",
++	       g_pcimem_physaddr, g_pcimem_physaddr_end, g_pcimem_busaddr);
++
++	/*
++	 * register the PCI bus fault interrupt
++	 */
++	if (request_irq(PCIEM86XX_PCIFAULT_INTR, pci_busfault_intr,
++		    IRQF_DISABLED, "tangox_pci_fault", &tangox_controller) != 0) {
++		printk("PCI: fail to register PCI fault ISR(%d)\n", PCIEM86XX_PCIFAULT_INTR);
++		return 0;
++	}
++
++	/* finally register pci controller */
++	register_pci_controller(&tangox_controller);
++
++	pci_active = 1;
++
++	return 0;
++}
++
++arch_initcall(tangox_pci_init);
++
++/* For shutting down all PCI devices on this bus */
++void tangox_pci_shutdown(void)
++{
++	struct pci_bus *bus = tangox_controller.bus;
++        struct list_head *list;
++
++	if (pci_active && bus) {
++		list_for_each(list, &bus->devices) {
++			pci_disable_device(pci_dev_b(list));
++		}
++	}
++}
++
++int
++pci_set_dma_mask(struct pci_dev *dev, u64 mask)
++{
++	if (!pci_dma_supported(dev, mask))
++		return -EIO;
++
++	if (em8xxx_kmem_size > (MAX_PCIMEM_MAP_SIZE << 20)) {
++#if defined(CONFIG_TANGO2)
++		dev->dma_mask = mask & 0x07ffffff;
++#elif defined(CONFIG_TANGO3)
++		dev->dma_mask = mask & 0x3fffffff;
++#else
++		dev->dma_mask = mask;
++#endif
++	} else
++		dev->dma_mask = mask;
++
++	return 0;
++}
++    
++int
++pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
++{
++	if (!pci_dma_supported(dev, mask))
++		return -EIO;
++
++	if (em8xxx_kmem_size > (MAX_PCIMEM_MAP_SIZE << 20)) {
++#if defined(CONFIG_TANGO2)
++		dev->dev.coherent_dma_mask = mask & 0x07ffffff;
++#elif defined(CONFIG_TANGO3)
++		dev->dev.coherent_dma_mask = mask & 0x3fffffff;
++#else
++		dev->dev.coherent_dma_mask = mask;
++#endif
++	} else
++		dev->dev.coherent_dma_mask = mask;
++
++	return 0;
++}
++
++void tangox_pci_enable(void)
++{
++	struct pci_bus *bus = tangox_controller.bus;
++        struct list_head *list;
++
++	if (pci_active) {
++		list_for_each(list, &bus->devices) {
++			pci_set_master(pci_dev_b(list));
++		}
++	}
++}
++
++EXPORT_SYMBOL(tangox_pci_shutdown);
++EXPORT_SYMBOL(tangox_pci_enable);
++
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/tangox/prom.c linux-2.6.29/arch/mips/tangox/prom.c
+--- linux-2.6.29.ref/arch/mips/tangox/prom.c	2011-04-26 20:59:19.000000000 -0700
++++ linux-2.6.29/arch/mips/tangox/prom.c	2011-04-26 21:03:21.424220501 -0700
+@@ -791,3 +791,84 @@
+   
+ EXPORT_SYMBOL(tangox_do_timer);
+ 
++#ifdef CONFIG_SD_DIRECT_DMA
++
++/* Given an address and length, determine if this area is physically contiguous or not, and
++   return the physical address of starting point, caller needs to ensure the page_table is
++   locked so no change is allowed. */
++int is_contiguous_memory(void __user *userbuf, unsigned int len, unsigned long *physaddr)
++{
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++	pte_t *pte;
++	unsigned long start = (unsigned long)userbuf;
++	unsigned long paddr, ppaddr;
++	unsigned long start_pg_addr, start_pg_offset, end_pg_addr, pg_addr;
++	struct mm_struct *mm = current->mm;
++	int ret = 0;
++
++//printk("%s:%d: start=0x%08lx, len=0x%x\n", __FILE__, __LINE__, start, len);
++
++	*physaddr = 0;
++	start_pg_addr = start & PAGE_MASK; /* address of start page */
++	start_pg_offset = start & (PAGE_SIZE - 1); /* offset within start page */
++	end_pg_addr = ((start + len) & PAGE_MASK) - (((start + len) & (PAGE_SIZE - 1)) ? 0 : PAGE_SIZE); /* address of last page */
++
++	for (ppaddr = 0, pg_addr = start_pg_addr; pg_addr <= end_pg_addr; pg_addr += PAGE_SIZE) {
++		if (pg_addr > TASK_SIZE)
++			pgd = pgd_offset_k(pg_addr);
++		else
++			pgd = pgd_offset_gate(mm, pg_addr);
++		BUG_ON(pgd_none(*pgd));
++		pud = pud_offset(pgd, pg_addr);
++		BUG_ON(pud_none(*pud));
++		pmd = pmd_offset(pud, pg_addr);
++		if (pmd_none(*pmd)) 
++			goto error;
++		pte = pte_offset_map(pmd, pg_addr);
++		if (pte_none(*pte)) {
++			pte_unmap(pte);
++			goto error;
++		}
++		paddr = pte_val(*pte) & PAGE_MASK;
++//printk("TRANSLATED 0x%08lx, pte=0x%p, paddr=0x%lx\n", pg, pte, paddr);
++		pte_unmap(pte);
++
++		if (ppaddr == 0) { /* first page */
++			ppaddr = paddr;
++			*physaddr = (ppaddr | start_pg_offset);
++		} else if ((ppaddr + PAGE_SIZE) != paddr) /* not contiguous */
++			goto not_contiguous;
++		else
++			ppaddr = paddr;
++	}
++	ret = 1;
++
++not_contiguous:
++error:
++//printk("%s:%d: return %d\n", __FILE__, __LINE__, ret);
++	return ret;
++}
++
++EXPORT_SYMBOL(is_contiguous_memory);
++
++#endif /* CONFIG_SD_DIRECT_DMA */
++
++/* convering virtual address to physical address (perform page table walking if needed) */
++unsigned long tangox_virt_to_phys(void *pvaddr)
++{
++#if defined(CONFIG_SD_DIRECT_DMA) || defined(CONFIG_HIGHMEM)
++	unsigned long vpa = (unsigned long)pvaddr & PAGE_MASK;
++	if (vpa >= KSEG2)
++		return (pte_val(*(pte_t *)pte_offset(pmd_offset(pud_offset(pgd_offset_k(vpa), vpa), vpa), vpa)) & PAGE_MASK) + ((unsigned long)pvaddr & ~PAGE_MASK);
++	else if (vpa >= KSEG0)
++		return virt_to_phys(pvaddr);
++ 	else
++		return (pte_val(*(pte_t *)pte_offset(pmd_offset(pud_offset(pgd_offset_gate(current->mm, vpa), vpa), vpa), vpa)) & PAGE_MASK) + ((unsigned long)pvaddr & ~PAGE_MASK);
++#else
++	return virt_to_phys(pvaddr);
++#endif
++}
++EXPORT_SYMBOL(tangox_virt_to_phys);
++
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/pci/setup-irq.c linux-2.6.29/drivers/pci/setup-irq.c
+--- linux-2.6.29.ref/drivers/pci/setup-irq.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/pci/setup-irq.c	2011-04-26 21:01:42.714059375 -0700
+@@ -21,7 +21,7 @@
+ static void __init
+ pdev_fixup_irq(struct pci_dev *dev,
+ 	       u8 (*swizzle)(struct pci_dev *, u8 *),
+-	       int (*map_irq)(struct pci_dev *, u8, u8))
++	       int (*map_irq)(const struct pci_dev *, u8, u8))
+ {
+ 	u8 pin, slot;
+ 	int irq = 0;
+@@ -56,7 +56,7 @@
+ 
+ void __init
+ pci_fixup_irqs(u8 (*swizzle)(struct pci_dev *, u8 *),
+-	       int (*map_irq)(struct pci_dev *, u8, u8))
++	       int (*map_irq)(const struct pci_dev *, u8, u8))
+ {
+ 	struct pci_dev *dev = NULL;
+ 	while ((dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/pci.h linux-2.6.29/include/linux/pci.h
+--- linux-2.6.29.ref/include/linux/pci.h	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/include/linux/pci.h	2011-04-26 21:01:42.714059375 -0700
+@@ -716,7 +716,7 @@
+ void pdev_sort_resources(struct pci_dev *, struct resource_list *);
+ int pci_enable_resources(struct pci_dev *, int mask);
+ void pci_fixup_irqs(u8 (*)(struct pci_dev *, u8 *),
+-		    int (*)(struct pci_dev *, u8, u8));
++		    int (*)(const struct pci_dev *, u8, u8));
+ #define HAVE_PCI_REQ_REGIONS	2
+ int __must_check pci_request_regions(struct pci_dev *, const char *);
+ int __must_check pci_request_regions_exclusive(struct pci_dev *, const char *);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/README.1006.pcidma.patch linux-2.6.29/README.1006.pcidma.patch
+--- linux-2.6.29.ref/README.1006.pcidma.patch	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/README.1006.pcidma.patch	2011-04-26 21:04:29.074821297 -0700
+@@ -0,0 +1,20 @@
++Feature:
++--------
++PCI host and DMA support for SMP8xxx chips
++
++Prerequisite patch numbers:
++---------------------------
++0000
++1000
++1001
++
++Primary author:
++---------------
++YH Lin
++
++Related to which chip version SMP86xx xx=?
++-----------------------------------------
++Tango2 ES6/RevA or above, or Tango3 ES1 or above.
++
++(linux patches) which CONFIG_... are provided:
++----------------------------------------------

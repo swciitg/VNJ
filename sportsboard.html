@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="bootstrap/css/bootstrap.css">
+  <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Signika" />
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+  <link href="css/bootstrap-responsive.css" rel="stylesheet">
+	<title>Sports Board</title>
+</head>
+
+<style type="text/css">
+
+      .headings{
+      font-family: Signika ;
+      color: #00C2B5;
+      font-size: 35px;
+      font-weight: 300;
+
+     }
+
+
+      .nav-pills li a {
+      font-family: Roboto;
+    	color: #494949;
+    	font-size: 14.5px;
+    	font-weight: 300;
+    	transform: scale(0.998,1.037);
+       -webkit-border-radius: 0;
+        -moz-border-radius: 0;
+        border-radius: 0;
+      }
+
+ 
+
+      .nav-pills > li.active > a, 
+      .nav-pills > li.active > a:hover, 
+      .nav-pills > li.active > a:focus {
+        color:white;
+        background-color:#00C2B5;
+      }
+      .nav-tabs {
+        text-align: center;
+        background-color: #00C2B5;
+      }
+   
+      
+
+      .carousel-control.left,
+      .carousel-control.right { background: none }
+    
+
+    
+      @font-face {
+        font-family: 'Roboto';
+        font-style: normal;
+        font-weight: 400;
+        src: local('Roboto Regular'), 
+             local('Roboto-Regular'), 
+             url(http://themes.googleusercontent.com/static/fonts/roboto/v11/2UX7WLTfW3W8TclTUvlFyQ.woff) 
+             format('woff');
+      }
+
+      @font-face {
+  font-family: 'Signika';
+  font-weight: 400;
+  font-style: normal;
+  src: url('http://fonts.gstatic.com/s/signika/v6/VXdqIs7WDCt-XY_CZ2hksw.eot');
+  src: url('http://fonts.gstatic.com/s/signika/v6/VXdqIs7WDCt-XY_CZ2hksw.eot?#iefix') format('embedded-opentype'),
+       local('Signika'),
+       local('Signika-regular'),
+       url('http://fonts.gstatic.com/s/signika/v6/DgXTNsU4VcVVFTc7jwBZzwLUuEpTyoUstqEm5AMlJo4.woff2') format('woff2'),
+       url('http://fonts.gstatic.com/s/signika/v6/T4xaKLLiHAltM2Q6-RoODgLUuEpTyoUstqEm5AMlJo4.woff') format('woff'),
+       url('http://fonts.gstatic.com/s/signika/v6/ejLRhBEorqjLDaF8s-xuTQ.ttf') format('truetype'),
+       url('http://fonts.gstatic.com/l/font?kit=5tVTlpEL90Fq0tycczbnOQ#Signika') format('svg');
+}
+
+@font-face {
+  font-family: 'Signika';
+  font-weight: 300;
+  font-style: normal;
+  src: url('http://fonts.gstatic.com/s/signika/v6/koFYE26bhT88HgRA8f4vbVQlYEbsez9cZjKsNMjLOwM.eot');
+  src: url('http://fonts.gstatic.com/s/signika/v6/koFYE26bhT88HgRA8f4vbVQlYEbsez9cZjKsNMjLOwM.eot?#iefix') format('embedded-opentype'),
+       local('Signika-Light'),
+       local('Signika-300'),
+       url('http://fonts.gstatic.com/s/signika/v6/koFYE26bhT88HgRA8f4vbQzyDMXhdD8sAj6OAJTFsBI.woff2') format('woff2'),
+       url('http://fonts.gstatic.com/s/signika/v6/koFYE26bhT88HgRA8f4vbb3hpw3pgy2gAi-Ip7WPMi0.woff') format('woff'),
+       url('http://fonts.gstatic.com/s/signika/v6/koFYE26bhT88HgRA8f4vbS3USBnSvpkopQaUR-2r7iU.ttf') format('truetype'),
+       url('http://fonts.gstatic.com/l/font?kit=koFYE26bhT88HgRA8f4vbaWUboTb-jS2tyCOQMtm97g#Signika') format('svg');
+
+     }
+
+
+      .navbar-inner {
+        background-color: transparent;
+        border:0px;
+      }
+
+      .content {
+        font-family: 'Roboto';
+        font-size: 15px;
+      }
+
+      .foot1 {
+        font-family: "Roboto";
+        font-weight: bold;
+        font-size: 16px;
+        color: #333333;
+      }
+      .foot2 {
+        font-family: "Roboto";
+        font-weight: normal;
+        font-size: 14px;
+        line-height: 22px;
+        color: #333333; 
+      }
+      .foot3 {
+        font-family: "Roboto";
+        font-weight: normal;
+        font-size: 15px;
+        line-height: 24px;
+        color: #333333;
+      }
+      
+
+</style>
+
+<body>
+ 
+<div class="container" >
+
+
+        <div  class="navbar navbar-default navbar-inner" style="background-color:transparent; border:0px; margin-bottom:-10px;">
+
+            <div class="navbar-header">
+              <a href="#"><img style="margin-top:10px;" src="images/logo.jpg" alt="gymkhana"></a>
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target=".navbar-menubuilder">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                  </button>
+            </div>
+
+            <div class="container">
+                <div class="collapse navbar-collapse navbar-menubuilder" style="margin-top:10px; margin-right:15px">
+                  
+                      <ul style="font-family:/"Roboto/; class="nav nav-pills navbar-right">
+                        <li><a href="../index.html">Home</a></li>
+                        <li><a href="../Senate/senate.html">Senate</a></li>	
+                        <li><a href="../technical/index.html">Technical</a></li>
+                        <li><a href="../Cultural Board/culthome.html">Cultural</a></li>
+                        <li class="active"><a href="#">Sports</a></li>
+                        <li><a href="../welfareBoard/welfareboard.html">Welfare</a></li>
+                        <li><a href="../hostelBoard/hab.html">HAB</a></li>
+                      </ul>
+
+                </div>  
+            </div>
+
+        </div>             <!-- Navbar ends here -->
+        <hr>
+</div>
+
+<!--Carousel starts-->
+
+
+      <div id="myCarousel" class="carousel slide" data-ride="carousel">
+
+                  <!-- Carousel indicators -->
+
+                  <ol class="carousel-indicators">
+                      <li data-target="#myCarousel" data-slide-to="0" class="active"></li>
+                      <li data-target="#myCarousel" data-slide-to="1"></li>
+                      <li data-target="#myCarousel" data-slide-to="2"></li>
+                      <li data-target="#myCarousel" data-slide-to="3"></li>
+
+                  </ol>   
+
+                  <!-- Wrapper for carousel items -->
+
+                  <div class="carousel-inner">
+                      <div class="item active">
+                          <img class="img-responsive center-block" src="images/sports-s1.jpg" alt="First Slide">
+                      </div>
+                      <div class="item">
+                          <img class="img-responsive center-block" src="images/sports-s2.jpg" alt="Second Slide">
+                      </div>
+                      <div class="item">
+                          <img class="img-responsive center-block" src="images/sports-s3.jpg" alt="Third Slide">
+                     </div>
+                      <div class="item">
+                          <img class="img-responsive center-block" src="images/sports-s4.jpg" alt="Fourth Slide">
+                     </div>
+                  </div>
+
+                  <!-- Carousel controls -->
+                  
+                  <a class="carousel-control left" href="#myCarousel" role="button" data-slide="prev">
+                      <span class="glyphicon glyphicon-chevron-left"></span>
+                  </a>
+                  <a class="carousel-control right" href="#myCarousel" role="button" data-slide="next">
+                      <span class="glyphicon glyphicon-chevron-right"></span>
+                  </a>
+
+      </div>
+      <br>
+
+<!-- carousel ends-->
+
+<!--main body starts-->
+<div class="container">
+  
+  <p class="headings"><img src="images/logo_sportsboard.jpg" style="height:55px; width:55px; float:left;"></img>Sports Board, IIT Guwahati</p>
+  
+
+  <div class="row"><!--row1 begins-->
+     <div class="col-md-8">
+
+      <h3 style="font-size:30px" class="headings">About Us</h3>
+      <p class="content">You are here for an overall development of your personality, so to keep you healthy and fit, we have all the facilities for sports, both indoor and outdoor.<br><br>
+
+      All outdoor sports like athletics, swimming, cricket, football, hockey, basketball, volleyball, etc. and indoor sports like table tennis, weight lifting, chess, carrom, squash, etc. are actively played by all throughout the year.<br><br>
+
+      We organize and promote all extra-curricular activities in the field of sports. It has currently twelve clubs: Athletics and Gymnastics Club, aquatics Club, Badminton Club, Basketball Club, Cricket Club, Football Club, Hockey Club, Lawn Tennis Club, Table Tennis Club, Squash Club, Volleyball Club and Weightlifting Club. The three main events conducted every year are Inter IIT Sports Meet, Spardha and Spirit. </p><br><br>
+
+     </div><!--col-md-8 ends here-->
+ 
+     <div class="col-lg-4"><br>
+
+        <div class="info" style="border: 1px solid #00C2B5;">
+          <ul class="nav nav-tabs">
+            <li class="content" style="font-size:20px;font-family:Roboto;font-weight:lighter;;padding:10px;">Chairman</li>
+          </ul>
+          <div class="tab-content">
+            <div class="row">
+            <div class="col-lg-5">
+              <img class="img-responsive" style=" margin-top:25px; margin-left:15px" src="images/prabhu.jpg">
+            </div>
+            <div class="col-lg-7">
+              <h3 style="font-family: Roboto;font-weight:lighter;">Dr. V. Prabhu</h3>
+              <p class="content">
+                Department of Humanities <br>and Social Sciences<br>
+                Contact: +91-361 258 2169/2560(O)<br>
+                chrsports@iitg.ac.in<br>
+              </p>
+            </div>
+            </div>
+          </div>
+        </div>
+
+     </div><!--col-lg-4 ends here-->
+ 
+  </div><!--row1 ends here-->
+
+  <!-- Events tabs begins here--><br>
+  <h3 style="font-size:30px" class="headings">Events</h3>
+  <div class="row"><!--row2 begins-->
+    
+     <div class="col-md-8">
+
+            <div class="info" style="border:1px solid #00C2B5;">
+              <ul class="nav nav-tabs">
+
+                <li class="content active"><a data-toggle="tab" href="#inter" style="font-size:20px; font-weight:lighter;">Inter IIT</a></li>
+                <li class="content"><a data-toggle="tab" href="#spardha" style="font-size:20px; font-weight:lighter;">Spardha</a></li>
+                <li class="content"><a data-toggle="tab" href="#spirit" style="font-size:20px; font-weight:lighter;">Spirit</a></li>
+                
+              </ul>
+           
+                <div class="tab-content">
+
+                  <div id="inter" class="tab-pane fade in active">
+                    <div class="row">
+                      <div class="col-md-3">
+                        <img class="img-responsive" style=" padding-top:15px; padding-left:10px" src="images/interiit.jpg">
+                      </div>
+                      <div class="col-md-9">
+                        <p class="content"style="padding:10px">Inter IIT Sports Meet is a contest held every winter at one of the IITs. The Meet affords the opportunity to the sportspersons from the IITs to showcase their talents. An Inter-IIT Aquatic meet is held separately as a part of the main meet each year preceding the main Inter-IIT Sports meet. The team excelling in both the meets is further awarded the General Championship. The probables for the meet are selected in September and are then subjected to regular coaching almost every evening in the odd semester by excellent coaches. A sports camp is organized at the end of the semester two weeks before Meet. It’s not easy to get into the Inter-IIT contingent. But dedication, hard work and passion can make everything possible. So if you want to represent your Institute at the highest level then dare and soar!</p>
+                      </div>
+                    </div>
+                  </div>
+               
+                  <div id="spardha" class="tab-pane fade">
+                    <div class="row">
+                      <div class="col-md-3">
+                        <img class="img-responsive" style=" padding-top:15px; padding-left:15px" src="images/spirit.jpg">
+                      </div>
+                      <div class="col-md-9">
+                        <p class="content" style="padding:10px">Spardha, the Inter Hostel Sports Competition, provides platform for all sportsmen, experienced and amateurs, in the campus. With the pride of your hostel at stake, this time in the sporting arena, Spardha will let you push the boundaries of what you can do for your hostel. It stretches throughout the even semester, and sees by far the largest participation from the students at IIT Guwahati. From aquatics to soccer, you can follow any sport that you love. The SAC grounds are open till 9 P.M. at night and you can issue sports equipment from the security guard at the SAC desk by bringing your I-Card. The use of the swimming pool requires you to register permanently and get a separate pool card. Don’t worry if you are a big zero in sports and never knew where to begin. There is a full-time dedicated team of professional coaches for various sporting activities. Physical fitness and mental alertness is a mantra for success in life. So, each one of you do make it a point to take some time out from your busy schedules for sports and extra-curricular activities.</p>
+                      </div>
+                    </div>
+                  </div>
+            
+                  <div id="spirit" class="tab-pane fade">
+                    <div class="row">
+                      <div class="col-md-3">
+                        <img class="img-responsive" style=" padding-top:15px; padding-left:15px; padding-bottom:10px;" src="images/spirit.jpg">
+                      </div>
+                      <div class="col-md-9">
+                        <p class="content"style="padding:10px"><br><br>Spirit is the annual sporting festival of IIT Guwahati. Held in the last week of October, it witnesses participation from across the North East. Some of the sporting talent on show is truly spectacular, with teams from our college pitted against professional sportsmen of real caliber. Spirit also serves the purpose of providing our probables for the Inter IIT Sports Meet an opportunity to iron out the flaws in their game, and gain some valuable match practice. Spirit is a spectacle not to be missed if you are a sports enthusiast.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                </div> 
+            </div>    
+
+     </div>
+
+     <div class="col-md-4">
+                <div class="info" style="border: 1px solid #00C2B5;">
+
+                    <ul class="nav nav-tabs" >
+                        <li class="active" style="width:50%; font-size:18px;font-family:Roboto;font-weight:lighter;"><a data-toggle="tab" href="#secretary">General Secretary</a></li>
+                        <li style="width:50%; font-size:18px;font-family:Roboto;font-weight:lighter;"><a data-toggle="tab" href="#manager">Events Manager</a></li>
+                    </ul>
+                  
+                  <div class="tab-content">
+                  <div class="row tab-pane fade in active" id="secretary">
+                    <div class="col-lg-3 col-sm-4 col-xs-6" style="width:45%">
+                        <img class="img-responsive" style="padding:5px; margin-top:10px; margin-left:10px" src="../images1/GS_Sports_Neeraj.jpg">
+                    </div>
+                    <div class="col-lg-9 col-sm-8 col-xs-6" style="width:55%">
+                        <p class="content">
+                        <h3>Neeraj Kumar Rathore</h3>
+                        Address: Lohit Hostel<br>
+                        Mobile: +91-6264009987<br>
+                        Webmail: sportsec@iitg.ac.in<br>
+                        </p>
+                    </div>
+                  </div>
+                  <div class="row tab-pane fade" id="manager">
+                    <div class="col-lg-3 col-sm-4 col-xs-6" style="width:35%"><br>
+                        <img class="img-responsive" style="padding:5px; margin-left:10px;margin-top:-10px;margin-bottom:10px; align:center;" src="images/nitin_events_manager.jpg">
+                    </div>
+                    <div class="col-lg-9 col-sm-8 col-xs-6" style="width:60%">
+                        <p class="content">
+                        <h3>Vikash Kumar</h3>
+                        Lohit Hostel<br> 
+                        Contact: +91-9102811310<br>
+                        Webmail: 180104084@iitg.ac.in<br>
+                      </p>
+                    </div><br>
+                  </div>
+                  </div>
+                  
+                </div>
+        </div>
+  
+    <!--col-md-4 ends here-->
+
+  </div> <!-- row2 ends here. Also Events ends here.-->
+
+
+   
+  <h3 style="font-size:30px" class="headings">Clubs</h3>
+  <div class="row"><!--row3 starts here-->
+    
+
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="aquatics.html"> <img src="icons/normal/aquatics.png" onmouseover="this.src='icons/hover/aquatics.png'" onmouseout="this.src='icons/normal/aquatics.png'"> </a>      
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="athletics.html"> <img src="icons/normal/athletics.png" onmouseover="this.src='icons/hover/athletics.png'" onmouseout="this.src='icons/normal/athletics.png'"> </a>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="badminton.html"> <img src="icons/normal/badminton.png" onmouseover="this.src='icons/hover/badminton.png'" onmouseout="this.src='icons/normal/badminton.png'"> </a>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="basketball.html"> <img src="icons/normal/basketball.png" onmouseover="this.src='icons/hover/basketball.png'" onmouseout="this.src='icons/normal/basketball.png'"> </a>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="cricket.html"> <img src="icons/normal/cricket.png" onmouseover="this.src='icons/hover/cricket.png'" onmouseout="this.src='icons/normal/cricket.png'"> </a>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="football.html"> <img src="icons/normal/football.png" onmouseover="this.src='icons/hover/football.png'" onmouseout="this.src='icons/normal/football.png'"> </a>
+          </div>
+        </div>
+      
+    
+
+  </div><!--row3 ends here-->
+  <br>
+  <div class="row"><!--row4 starts here-->
+    
+
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="hockey.html"> <img src="icons/normal/hockey.png" onmouseover="this.src='icons/hover/hockey.png'" onmouseout="this.src='icons/normal/hockey.png'"> </a> 
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="squash.html"> <img src="icons/normal/squash.png" onmouseover="this.src='icons/hover/squash.png'" onmouseout="this.src='icons/normal/squash.png'"> </a>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="tennis.html"> <img src="icons/normal/tennis.png" onmouseover="this.src='icons/hover/tennis.png'" onmouseout="this.src='icons/normal/tennis.png'"> </a>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="tt.html"> <img src="icons/normal/tt.png" onmouseover="this.src='icons/hover/tt.png'" onmouseout="this.src='icons/normal/tt.png'"> </a>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+           <a href="volleyball.html"> <img src="icons/normal/volleyball.png" onmouseover="this.src='icons/hover/volleyball.png'" onmouseout="this.src='icons/normal/volleyball.png'"> </a>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="icon">
+            <a href="weightlifting.html"> <img src="icons/normal/weightlifting.png" onmouseover="this.src='icons/hover/weightlifting.png'" onmouseout="this.src='icons/normal/weightlifting.png'"> </a>
+          </div>
+        </div>
+      
+   
+
+  </div><!--row4 ends here-->
+
+</div> <!--container ends here-->
+  
+  <br><br><br>
+
+  <!--footer begins here-->
+
+ <footer class="footer" style="background-color:#f3f0f0; border-top:1px">
+    <div class="container">
+      <div class="row"><br><br><br>
+        <div class="col-md-4" style="text-align:center;">
+          
+            <p class="foot2">
+              Students' Gymkhana Council,
+              New SAC Building<br>
+              IIT Guwahati, Guwahati (Assam) - 781039<br>
+              <br><br>
+            </p>
+            
+              
+            
+          
+        </div>
+        
+        <div class="col-md-4"style="text-align:center;">
+          
+            
+            <p class="foot2" style="margin-top:-25px;">
+              <a href="https://twitter.com/_iitg" target="_blank"><img src="images/twitter42.png" /></a>&nbsp;
+                            <a href="https://www.facebook.com/iitgwt" target="_blank"><img src="images/facebook42.png" /></a>&nbsp;
+                            <a href="https://plus.google.com/+iitguwahati" target="_blank"><img src="images/google-plus42.png" /></a><br><br>
+                            +91-361-2582162<br>
+                                   sgciitg@gmail.com<br><br>
+                            <a href="https://play.google.com/store/apps/details?id=com.iitg.sgc">
+                <img style="width:100px; height:auto;"alt="Android app on Google Play"
+                     src="../images/play.png" />
+              </a><br>
+            </p>
+          
+        </div>
+        <div class="col-md-4" style="text-align:center;">
+          
+            
+            <p class="foot2">
+              
+                &copy; Students' Gymkhana Council, IIT Guwahati<br><a style="color:#000000" href="../sgc/sgc1.html">
+              Maintained by Digital Ops Team, SGC IIT Guwahati</a>
+              </a><br>
+              <a href="http://twitter.com/minimalmonkey" class="icon-button twitter"><i class="icon-twitter"></i><span></span></a>
+              <a href="http://facebook.com" class="icon-button facebook"><i class="icon-facebook"></i><span></span></a>
+              <a href="http://plus.google.com" class="icon-button google-plus"><i class="icon-google-plus"></i><span></span></a>
+            </p>
+          
+        </div>
+      </div>
+    </div>
+  </footer>
+  <!-- Footer ends here -->
+  
+      
+
+</body>
+ </html> 
+        
