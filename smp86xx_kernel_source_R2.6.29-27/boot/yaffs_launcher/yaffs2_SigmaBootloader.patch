@@ -1,0 +1,171 @@
+diff --git a/direct/basic-test/yaffscfg2k.c b/direct/basic-test/yaffscfg2k.c
+index de8953e..a2d12c7 100644
+--- a/direct/basic-test/yaffscfg2k.c
++++ b/direct/basic-test/yaffscfg2k.c
+@@ -21,13 +21,10 @@
+ #include "yaffscfg.h"
+ #include "yaffs_guts.h"
+ #include "yaffsfs.h"
+-#include "yaffs_fileem2k.h"
+-#include "yaffs_nandemul2k.h"
+-#include "yaffs_norif1.h"
+ #include "yaffs_trace.h"
+ 
++#include "../../../yaffs_nand_if.h"
+ 
+-#include <errno.h>
+ 
+ unsigned yaffs_trace_mask = 
+ 
+@@ -101,14 +98,9 @@ void yaffsfs_LocalInitialisation(void)
+ 
+ // Configuration
+ 
+-#include "yaffs_ramdisk.h"
+-#include "yaffs_flashif.h"
+-#include "yaffs_flashif2.h"
+-#include "yaffs_nandemul2k.h"
+-
+-struct yaffs_dev_s ram1Dev;
+ struct yaffs_dev_s flashDev;
+-struct yaffs_dev_s m18_1Dev;
++
++struct ynandv2_ChipAttrib chipAttrib;
+ 
+ int yaffs_start_up(void)
+ {
+@@ -117,45 +109,6 @@ int yaffs_start_up(void)
+ 	yaffsfs_LocalInitialisation();
+ 	
+ 	// Set up devices
+-	// /ram1   ram, yaffs1
+-	memset(&ram1Dev,0,sizeof(ram1Dev));
+-	ram1Dev.param.name = "ram1";
+-	ram1Dev.param.total_bytes_per_chunk = 512;
+-	ram1Dev.param.chunks_per_block = 32;
+-	ram1Dev.param.n_reserved_blocks = 2; // Set this smaller for RAM
+-	ram1Dev.param.start_block = 0; // Can use block 0
+-	ram1Dev.param.end_block = 127; // Last block in 2MB.	
+-	//ram1Dev.param.use_nand_ecc = 1;
+-	ram1Dev.param.n_caches = 0;	// Disable caching on this device.
+-	ram1Dev.driver_context = (void *) 0;	// Used to identify the device in fstat.
+-	ram1Dev.param.write_chunk_tags_fn = yramdisk_wr_chunk;
+-	ram1Dev.param.read_chunk_tags_fn = yramdisk_rd_chunk;
+-	ram1Dev.param.erase_fn = yramdisk_erase;
+-	ram1Dev.param.initialise_flash_fn = yramdisk_initialise;
+-	
+-	yaffs_add_device(&ram1Dev);
+-
+-	// /M18-1 yaffs1 on M18 nor sim
+-	memset(&m18_1Dev,0,sizeof(m18_1Dev));
+-	m18_1Dev.param.name = "M18-1";
+-	m18_1Dev.param.total_bytes_per_chunk = 1024;
+-	m18_1Dev.param.chunks_per_block =248;
+-	m18_1Dev.param.n_reserved_blocks = 2;
+-	m18_1Dev.param.start_block = 0; // Can use block 0
+-	m18_1Dev.param.end_block = 31; // Last block
+-	m18_1Dev.param.use_nand_ecc = 0; // use YAFFS's ECC
+-	m18_1Dev.param.n_caches = 10; // Use caches
+-	m18_1Dev.driver_context = (void *) 1;	// Used to identify the device in fstat.
+-	m18_1Dev.param.write_chunk_fn = ynorif1_WriteChunkToNAND;
+-	m18_1Dev.param.read_chunk_fn = ynorif1_ReadChunkFromNAND;
+-	m18_1Dev.param.erase_fn = ynorif1_EraseBlockInNAND;
+-	m18_1Dev.param.initialise_flash_fn = ynorif1_InitialiseNAND;
+-	m18_1Dev.param.deinitialise_flash_fn = ynorif1_Deinitialise_flash_fn;
+-
+-//	m18_1Dev.param.disable_soft_del = 1;
+-
+-	yaffs_add_device(&m18_1Dev);
+-
+ 	// /yaffs2  yaffs2 file emulation
+ 	// 2kpage/64chunk per block
+ 	//
+@@ -164,22 +117,26 @@ int yaffs_start_up(void)
+ 	flashDev.param.total_bytes_per_chunk = 2048;
+ 	flashDev.param.chunks_per_block = 64;
+ 	flashDev.param.n_reserved_blocks = 5;
+-	flashDev.param.inband_tags = 0;
+-	flashDev.param.start_block = 0;
+-	flashDev.param.end_block = yflash2_GetNumberOfBlocks()-1;
++	flashDev.param.inband_tags = 1; /* Use in-band tags */
++	flashDev.param.start_block = ynandv2_GetStartBlock();
++	flashDev.param.end_block = ynandv2_GetEndBlock();
+ 	flashDev.param.is_yaffs2 = 1;
+-	flashDev.param.use_nand_ecc=1;
++	flashDev.param.use_nand_ecc=1; /* The driver will perform ECC */
++	flashDev.param.no_tags_ecc=1; /* Don't do ECC on the Tags */
+ 	flashDev.param.wide_tnodes_disabled=0;
+-	flashDev.param.refresh_period = 1000;
++	flashDev.param.refresh_period = 0; /* Don't need refresh for SLC, very high number of cycles for wear-on-read. */
+ 	flashDev.param.n_caches = 10; // Use caches
+-	flashDev.driver_context = (void *) 2;	// Used to identify the device in fstat.
+-	flashDev.param.write_chunk_tags_fn = yflash2_WriteChunkWithTagsToNAND;
+-	flashDev.param.read_chunk_tags_fn = yflash2_ReadChunkWithTagsFromNAND;
+-	flashDev.param.erase_fn = yflash2_EraseBlockInNAND;
+-	flashDev.param.initialise_flash_fn = yflash2_InitialiseNAND;
+-	flashDev.param.bad_block_fn = yflash2_MarkNANDBlockBad;
+-	flashDev.param.query_block_fn = yflash2_QueryNANDBlock;
++	flashDev.param.write_chunk_tags_fn = ynandv2_WriteChunkWithTagsToNAND;
++	flashDev.param.read_chunk_tags_fn = ynandv2_ReadChunkWithTagsFromNAND;
++	flashDev.param.erase_fn = ynandv2_EraseBlockInNAND;
++	flashDev.param.initialise_flash_fn = ynandv2_InitialiseNAND;
++	flashDev.param.bad_block_fn = ynandv2_MarkNANDBlockBad;
++	flashDev.param.query_block_fn = ynandv2_QueryNANDBlock;
+ 	flashDev.param.enable_xattr = 1;
++	flashDev.param.skip_checkpt_rd = 1;
++	flashDev.param.skip_checkpt_wr = 1;
++	chipAttrib.chipsel = ynandv2_GetChipSelect();
++	flashDev.driver_context = (void *)&chipAttrib;
+ 
+ 	yaffs_add_device(&flashDev);
+ 
+diff --git a/direct/yaffscfg.h b/direct/yaffscfg.h
+index c4cd48b..dab5ddc 100644
+--- a/direct/yaffscfg.h
++++ b/direct/yaffscfg.h
+@@ -41,6 +41,9 @@ void yaffsfs_Unlock(void);
+ __u32 yaffsfs_CurrentTime(void);
+ 
+ void yaffsfs_SetError(int err);
++int yaffsfs_GetLastError(void);
++
++void yaffsfs_LocalInitialisation(void);
+ 
+ #endif
+ 
+diff --git a/direct/yaffsfs.c b/direct/yaffsfs.c
+index ea33223..ecb044e 100644
+--- a/direct/yaffsfs.c
++++ b/direct/yaffsfs.c
+@@ -1211,7 +1211,7 @@ static int yaffsfs_DoStat(yaffs_obj_t *obj,struct yaffs_stat *buf)
+ 	    	buf->st_size = yaffs_get_obj_length(obj);
+ 	    	buf->st_blksize = obj->my_dev->data_bytes_per_chunk;
+ 	    	buf->st_blocks = (buf->st_size + buf->st_blksize -1)/buf->st_blksize;
+-#if CONFIG_YAFFS_WINCE
++#ifdef CONFIG_YAFFS_WINCE
+ 		buf->yst_wince_atime[0] = obj->win_atime[0];
+ 		buf->yst_wince_atime[1] = obj->win_atime[1];
+ 		buf->yst_wince_ctime[0] = obj->win_ctime[0];
+diff --git a/direct/ydirectenv.h b/direct/ydirectenv.h
+index 824ce20..222856f 100644
+--- a/direct/ydirectenv.h
++++ b/direct/ydirectenv.h
+@@ -89,6 +89,18 @@
+ 
+ #include "yaffsfs.h"
+ 
++/*
++ * Customizations for environment follows
++ */
++
++#include "../../includes/uart.h"
++
++int strnlen(const char *s, int maxlen);
++
++#define printf uart_printf
++
++/* End of Customizations */
++
+ #endif
+ 
+ 

@@ -1,0 +1,77 @@
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.29.ref/net/core/dev.c linux-2.6.29/net/core/dev.c
+--- linux-2.6.29.ref/net/core/dev.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/net/core/dev.c	2009-08-03 08:32:13.000000000 -0700
+@@ -443,6 +443,10 @@
+ /* Boot time configuration table */
+ static struct netdev_boot_setup dev_boot_setup[NETDEV_BOOT_SETUP_MAX];
+ 
++#ifdef CONFIG_SD_IPFILTER
++void *(*sd_ipfilter)(unsigned char *, int) = NULL;
++#endif
++
+ /**
+  *	netdev_boot_setup_add	- add new setup entry
+  *	@name: name of the device
+@@ -1948,6 +1952,13 @@
+ 	struct softnet_data *queue;
+ 	unsigned long flags;
+ 
++#ifdef CONFIG_SD_IPFILTER
++	if ((sd_ipfilter != NULL) && (((*sd_ipfilter)(skb->data, skb->len)) == NULL)) {
++		kfree_skb(skb);
++		return NET_RX_SUCCESS;
++	}
++#endif
++
+ 	/* if netpoll wants it, pretend we never saw it */
+ 	if (netpoll_rx(skb))
+ 		return NET_RX_DROP;
+@@ -2235,6 +2246,13 @@
+ 	int ret = NET_RX_DROP;
+ 	__be16 type;
+ 
++#ifdef CONFIG_SD_IPFILTER
++	if ((sd_ipfilter != NULL) && (((*sd_ipfilter)(skb->data, skb->len)) == NULL)) {
++		kfree_skb(skb);
++		return NET_RX_SUCCESS;
++	}
++#endif
++
+ 	if (skb->vlan_tci && vlan_hwaccel_do_receive(skb))
+ 		return NET_RX_SUCCESS;
+ 
+@@ -5269,6 +5287,10 @@
+ EXPORT_SYMBOL(br_fdb_put_hook);
+ #endif
+ 
++#ifdef CONFIG_SD_IPFILTER
++EXPORT_SYMBOL(sd_ipfilter);
++#endif
++
+ EXPORT_SYMBOL(dev_load);
+ 
+ EXPORT_PER_CPU_SYMBOL(softnet_data);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.29.ref/README.1017.ipfilter.patch linux-2.6.29/README.1017.ipfilter.patch
+--- linux-2.6.29.ref/README.1017.ipfilter.patch	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/README.1017.ipfilter.patch	2009-08-03 08:33:38.000000000 -0700
+@@ -0,0 +1,20 @@
++Feature:
++--------
++Hooks for Sigma's IP filter.
++
++Prerequisite patch numbers:
++---------------------------
++0000
++1000
++1001
++
++Primary author:
++---------------
++YH Lin
++
++Related to which chip version SMP86xx xx=?
++-----------------------------------------
++all
++
++(linux patches) which CONFIG_... are provided:
++----------------------------------------------
