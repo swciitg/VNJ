@@ -1,0 +1,803 @@
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/include/asm/checksum.h linux-2.6.29/arch/mips/include/asm/checksum.h
+--- linux-2.6.29.ref/arch/mips/include/asm/checksum.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/arch/mips/include/asm/checksum.h	2010-11-02 15:56:11.454234898 -0700
+@@ -15,6 +15,8 @@
+ 
+ #include <asm/uaccess.h>
+ 
++#include <asm/unaligned.h>
++
+ /*
+  * computes the checksum of a memory block at buff, length len,
+  * and adds in "sum" (32-bit)
+@@ -102,26 +104,30 @@
+ {
+ 	const unsigned int *word = iph;
+ 	const unsigned int *stop = word + ihl;
+-	unsigned int csum;
++	unsigned int csum, tmp;
+ 	int carry;
+ 
+-	csum = word[0];
+-	csum += word[1];
+-	carry = (csum < word[1]);
++	csum = get_unaligned(word);
++	tmp = get_unaligned(word + 1);
++	csum += tmp;
++	carry = (csum < tmp);
+ 	csum += carry;
+ 
+-	csum += word[2];
+-	carry = (csum < word[2]);
++	tmp = get_unaligned(word + 2);
++	csum += tmp;
++	carry = (csum < tmp);
+ 	csum += carry;
+ 
+-	csum += word[3];
+-	carry = (csum < word[3]);
++	tmp = get_unaligned(word + 3);
++	csum += tmp;
++	carry = (csum < tmp);
+ 	csum += carry;
+ 
+ 	word += 4;
+ 	do {
+-		csum += *word;
+-		carry = (csum < *word);
++		tmp = get_unaligned(word);
++		csum += tmp;
++		carry = (csum < tmp);
+ 		csum += carry;
+ 		word++;
+ 	} while (word != stop);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/kernel/unaligned.c linux-2.6.29/arch/mips/kernel/unaligned.c
+--- linux-2.6.29.ref/arch/mips/kernel/unaligned.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/arch/mips/kernel/unaligned.c	2010-11-02 15:56:11.454234898 -0700
+@@ -101,6 +101,9 @@
+ #endif
+ extern void show_registers(struct pt_regs *regs);
+ 
++/* enable message to print unaligned access */
++//[jmy]#define PRINT_UNALIGNED_ACCESS
++ 
+ static void emulate_load_store_insn(struct pt_regs *regs,
+ 	void __user *addr, unsigned int __user *pc)
+ {
+@@ -110,11 +113,43 @@
+ 
+ 	regs->regs[0] = 0;
+ 
++#ifdef PRINT_UNALIGNED_ACCESS
++	if (printk_ratelimit())
++		printk("Cpu%d[%s:%d:0x%08lx:0x%08lx] ", raw_smp_processor_id(),
++	       		current->comm, current->pid, regs->cp0_epc, regs->cp0_badvaddr);
++#endif
++
+ 	/*
+ 	 * This load never faults.
+ 	 */
+ 	__get_user(insn.word, pc);
+ 
++#if defined(CONFIG_TANGO3_864X)
++	/*
++	  fix DSP r2 lhx and lwx too. see MD00374 page 131 (works on 74K only; on 24K you don't get AdEL but RI!)
++
++	  verified with
++	  
++	  *iptr=0x42434445;
++	  
++	  int q=0xffffffff;
++	  asm __volatile__(".set dspr2; lhx %0, $0(%1)":"=&r"(q):"r"(iptr));
++	  printf("0x%08lx\n",q);
++	  asm __volatile__(".set dspr2; lwx %0, $0(%1)":"=&r"(q):"r"(iptr));
++	  printf("0x%08lx\n",q);
++	*/
++	if ((insn.r_format.opcode==31)
++	    &&(insn.r_format.func==10)) {
++		// cheat the destination
++		insn.i_format.rt=insn.r_format.rd;
++		// cheat the function
++		if (insn.r_format.re==0)
++			insn.i_format.opcode=lw_op;
++		if (insn.r_format.re==4)
++			insn.i_format.opcode=lh_op;
++	}
++#endif
++	
+ 	switch (insn.i_format.opcode) {
+ 	/*
+ 	 * These are instructions that a compiler doesn't generate.  We
+@@ -143,6 +178,10 @@
+ 	case lb_op:
+ 	case lbu_op:
+ 	case sb_op:
++#ifdef PRINT_UNALIGNED_ACCESS
++		if (printk_ratelimit())
++			printk("no fix-ups.\n");
++#endif
+ 		goto sigbus;
+ 
+ 	/*
+@@ -449,6 +488,10 @@
+ 		/*
+ 		 * I herewith declare: this does not happen.  So send SIGBUS.
+ 		 */
++#ifdef PRINT_UNALIGNED_ACCESS
++		if (printk_ratelimit())
++			printk("no fix-ups.\n");
++#endif
+ 		goto sigbus;
+ 
+ 	case lwc2_op:
+@@ -467,6 +510,10 @@
+ 		 * Pheeee...  We encountered an yet unknown instruction or
+ 		 * cache coherence problem.  Die sucker, die ...
+ 		 */
++#ifdef PRINT_UNALIGNED_ACCESS
++		if (printk_ratelimit())
++			printk("no fix-ups.\n");
++#endif
+ 		goto sigill;
+ 	}
+ 
+@@ -474,6 +521,11 @@
+ 	unaligned_instructions++;
+ #endif
+ 
++#ifdef PRINT_UNALIGNED_ACCESS
++	if (printk_ratelimit())
++		printk("fix-ups done.\n");
++#endif
++
+ 	return;
+ 
+ fault:
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/math-emu/cp1emu.c linux-2.6.29/arch/mips/math-emu/cp1emu.c
+--- linux-2.6.29.ref/arch/mips/math-emu/cp1emu.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/arch/mips/math-emu/cp1emu.c	2010-11-02 15:56:11.454234898 -0700
+@@ -259,6 +259,9 @@
+ 			MIPSInst_SIMM(ir));
+ 		u64 val;
+ 
++		if ((u32)va & (sizeof(u64)-1))	/* not aligned to proper boundary */
++			return SIGBUS;
++
+ 		fpuemustats.loads++;
+ 		if (get_user(val, va)) {
+ 			fpuemustats.errors++;
+@@ -273,6 +276,9 @@
+ 			MIPSInst_SIMM(ir));
+ 		u64 val;
+ 
++		if ((u32)va & (sizeof(u64)-1))	/* not aligned to proper boundary */
++			return SIGBUS;
++
+ 		fpuemustats.stores++;
+ 		DIFROMREG(val, MIPSInst_RT(ir));
+ 		if (put_user(val, va)) {
+@@ -686,6 +692,9 @@
+ 			va = (void __user *) (xcp->regs[MIPSInst_FR(ir)] +
+ 				xcp->regs[MIPSInst_FT(ir)]);
+ 
++			if ((u32)va & (sizeof(u64)-1))	/* not aligned to proper boundary */
++				return SIGBUS;
++
+ 			fpuemustats.loads++;
+ 			if (get_user(val, va)) {
+ 				fpuemustats.errors++;
+@@ -698,6 +707,9 @@
+ 			va = (void __user *) (xcp->regs[MIPSInst_FR(ir)] +
+ 				xcp->regs[MIPSInst_FT(ir)]);
+ 
++			if ((u32)va & (sizeof(u64)-1))	/* not aligned to proper boundary */
++				return SIGBUS;
++
+ 			fpuemustats.stores++;
+ 			DIFROMREG(val, MIPSInst_FS(ir));
+ 			if (put_user(val, va)) {
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/cifs/cifspdu.h linux-2.6.29/fs/cifs/cifspdu.h
+--- linux-2.6.29.ref/fs/cifs/cifspdu.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/cifs/cifspdu.h	2010-11-02 15:56:11.454234898 -0700
+@@ -414,8 +414,16 @@
+ 	__u8 WordCount;
+ } __attribute__((packed));
+ /* given a pointer to an smb_hdr retrieve the value of byte count */
++#ifdef CONFIG_MIPS
++#define BCC(smb_var) get_unaligned((__u16 *)((char *)smb_var + sizeof(struct smb_hdr) + (2 * smb_var->WordCount)))
++#define BCC_SET(smb_var,val) put_unaligned((__u16)val,(__u16 *)((char *)smb_var + sizeof(struct smb_hdr) + (2 * smb_var->WordCount)))
++#define BCC_LE(smb_var) get_unaligned((__le16 *)((char *)smb_var + sizeof(struct smb_hdr) + (2 * smb_var->WordCount)))
++#define BCC_LE_SET(smb_var,val) put_unaligned((__le16)val,(__le16 *)((char *)smb_var + sizeof(struct smb_hdr) + (2 * smb_var->WordCount)))
++#else
+ #define BCC(smb_var) (*(__u16 *)((char *)smb_var + sizeof(struct smb_hdr) + (2 * smb_var->WordCount)))
+ #define BCC_LE(smb_var) (*(__le16 *)((char *)smb_var + sizeof(struct smb_hdr) + (2 * smb_var->WordCount)))
++#endif
++
+ /* given a pointer to an smb_hdr retrieve the pointer to the byte area */
+ #define pByteArea(smb_var) ((unsigned char *)smb_var + sizeof(struct smb_hdr) + (2 * smb_var->WordCount) + 2)
+ 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/cifs/cifssmb.c linux-2.6.29/fs/cifs/cifssmb.c
+--- linux-2.6.29.ref/fs/cifs/cifssmb.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/cifs/cifssmb.c	2010-11-02 15:56:11.454234898 -0700
+@@ -430,7 +430,13 @@
+ 				pBCC = (pSMB->hdr.WordCount * 2) +
+ 					sizeof(struct smb_hdr) +
+ 					(char *)pSMB;
+-				if ((total_size <= (*(u16 *)pBCC)) &&
++				if ((total_size <= 
++#ifdef CONFIG_MIPS
++					(get_unaligned((u16 *)pBCC))
++#else
++					(*(u16 *)pBCC)
++#endif
++					) &&
+ 				   (total_size <
+ 					CIFSMaxBufSize+MAX_CIFS_HDR_SIZE)) {
+ 					return 0;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/cifs/cifs_unicode.c linux-2.6.29/fs/cifs/cifs_unicode.c
+--- linux-2.6.29.ref/fs/cifs/cifs_unicode.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/cifs/cifs_unicode.c	2010-11-02 15:56:11.454234898 -0700
+@@ -77,14 +77,25 @@
+ 			       ("strtoUCS: char2uni of %d returned %d",
+ 				(int)*from, charlen));
+ 			/* A question mark */
++#ifdef CONFIG_MIPS
++			put_unaligned((__le16)cpu_to_le16(0x003f), &to[i]);
++#else
+ 			to[i] = cpu_to_le16(0x003f);
++#endif
+ 			charlen = 1;
+ 		} else
++#ifdef CONFIG_MIPS
++			put_unaligned((__le16)cpu_to_le16(get_unaligned(&wchar_to[i])), &to[i]);
++#else
+ 			to[i] = cpu_to_le16(wchar_to[i]);
+-
++#endif
+ 	}
+ 
++#ifdef CONFIG_MIPS
++	put_unaligned((__le16)0, &to[i]);
++#else
+ 	to[i] = 0;
++#endif
+ 	return i;
+ }
+ 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/cifs/connect.c linux-2.6.29/fs/cifs/connect.c
+--- linux-2.6.29.ref/fs/cifs/connect.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/cifs/connect.c	2010-11-02 15:56:11.454234898 -0700
+@@ -299,7 +299,11 @@
+ 	pSMBt->t2_rsp.DataCount = cpu_to_le16(total_in_buf);
+ 	byte_count = le16_to_cpu(BCC_LE(pTargetSMB));
+ 	byte_count += total_in_buf2;
++#ifdef CONFIG_MIPS
++	BCC_LE_SET(pTargetSMB, cpu_to_le16(byte_count));
++#else
+ 	BCC_LE(pTargetSMB) = cpu_to_le16(byte_count);
++#endif
+ 
+ 	byte_count = pTargetSMB->smb_buf_length;
+ 	byte_count += total_in_buf2;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/cifs/sess.c linux-2.6.29/fs/cifs/sess.c
+--- linux-2.6.29.ref/fs/cifs/sess.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/cifs/sess.c	2010-11-02 15:56:11.454234898 -0700
+@@ -657,7 +657,11 @@
+ 	count = iov[1].iov_len + iov[2].iov_len;
+ 	smb_buf->smb_buf_length += count;
+ 
++#ifdef CONFIG_MIPS
++	BCC_LE_SET(smb_buf, cpu_to_le16(count));
++#else
+ 	BCC_LE(smb_buf) = cpu_to_le16(count);
++#endif
+ 
+ 	rc = SendReceive2(xid, ses, iov, 3 /* num_iovecs */, &resp_buf_type,
+ 			  CIFS_STD_OP /* not long */ | CIFS_LOG_ERROR);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/cifs/transport.c linux-2.6.29/fs/cifs/transport.c
+--- linux-2.6.29.ref/fs/cifs/transport.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/cifs/transport.c	2010-11-02 15:56:11.454234898 -0700
+@@ -611,8 +611,12 @@
+ 		if (receive_len >= sizeof(struct smb_hdr) - 4
+ 		    /* do not count RFC1001 header */  +
+ 		    (2 * midQ->resp_buf->WordCount) + 2 /* bcc */ )
++#ifdef CONFIG_MIPS
++			BCC_SET(midQ->resp_buf, le16_to_cpu(BCC_LE(midQ->resp_buf)));
++#else
+ 			BCC(midQ->resp_buf) =
+ 				le16_to_cpu(BCC_LE(midQ->resp_buf));
++#endif
+ 		if ((flags & CIFS_NO_RESP) == 0)
+ 			midQ->resp_buf = NULL;  /* mark it so buf will
+ 						   not be freed by
+@@ -800,7 +804,11 @@
+ 		if (receive_len >= sizeof(struct smb_hdr) - 4
+ 		    /* do not count RFC1001 header */  +
+ 		    (2 * out_buf->WordCount) + 2 /* bcc */ )
++#ifdef CONFIG_MIPS
++			BCC_SET(out_buf, le16_to_cpu(BCC_LE(out_buf)));
++#else
+ 			BCC(out_buf) = le16_to_cpu(BCC_LE(out_buf));
++#endif
+ 	} else {
+ 		rc = -EIO;
+ 		cERROR(1, ("Bad MID state?"));
+@@ -1050,7 +1058,11 @@
+ 	if (receive_len >= sizeof(struct smb_hdr) - 4
+ 	    /* do not count RFC1001 header */  +
+ 	    (2 * out_buf->WordCount) + 2 /* bcc */ )
++#ifdef CONFIG_MIPS
++		BCC_SET(out_buf, le16_to_cpu(BCC_LE(out_buf)));
++#else
+ 		BCC(out_buf) = le16_to_cpu(BCC_LE(out_buf));
++#endif
+ 
+ out:
+ 	DeleteMidQEntry(midQ);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/nls/nls_ascii.c linux-2.6.29/fs/nls/nls_ascii.c
+--- linux-2.6.29.ref/fs/nls/nls_ascii.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/nls/nls_ascii.c	2010-11-02 15:56:11.454234898 -0700
+@@ -12,6 +12,7 @@
+ #include <linux/string.h>
+ #include <linux/nls.h>
+ #include <linux/errno.h>
++#include <asm/unaligned.h>
+ 
+ static const wchar_t charset2uni[256] = {
+ 	/* 0x00*/
+@@ -136,8 +137,8 @@
+ 
+ static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
+ {
+-	*uni = charset2uni[*rawstring];
+-	if (*uni == 0x0000)
++	put_unaligned((wchar_t)charset2uni[*rawstring], uni);
++	if (get_unaligned(uni) == 0x0000)
+ 		return -EINVAL;
+ 	return 1;
+ }
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/nls/nls_base.c linux-2.6.29/fs/nls/nls_base.c
+--- linux-2.6.29.ref/fs/nls/nls_base.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/nls/nls_base.c	2010-11-02 15:56:11.454234898 -0700
+@@ -15,6 +15,7 @@
+ #include <linux/errno.h>
+ #include <linux/kmod.h>
+ #include <linux/spinlock.h>
++#include <asm/unaligned.h>
+ 
+ static struct nls_table default_table;
+ static struct nls_table *tables = &default_table;
+@@ -436,8 +437,8 @@
+ 
+ static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
+ {
+-	*uni = charset2uni[*rawstring];
+-	if (*uni == 0x0000)
++	put_unaligned((wchar_t)charset2uni[*rawstring], uni);
++	if (get_unaligned(uni) == 0x0000)
+ 		return -EINVAL;
+ 	return 1;
+ }
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/nls/nls_cp437.c linux-2.6.29/fs/nls/nls_cp437.c
+--- linux-2.6.29.ref/fs/nls/nls_cp437.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/nls/nls_cp437.c	2010-11-02 15:56:11.464216630 -0700
+@@ -12,6 +12,7 @@
+ #include <linux/string.h>
+ #include <linux/nls.h>
+ #include <linux/errno.h>
++#include <asm/unaligned.h>
+ 
+ static const wchar_t charset2uni[256] = {
+ 	/* 0x00*/
+@@ -357,8 +358,8 @@
+ 
+ static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
+ {
+-	*uni = charset2uni[*rawstring];
+-	if (*uni == 0x0000)
++	put_unaligned((wchar_t)charset2uni[*rawstring], uni);
++	if (get_unaligned(uni) == 0x0000)
+ 		return -EINVAL;
+ 	return 1;
+ }
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/nls/nls_iso8859-1.c linux-2.6.29/fs/nls/nls_iso8859-1.c
+--- linux-2.6.29.ref/fs/nls/nls_iso8859-1.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/nls/nls_iso8859-1.c	2010-11-02 15:56:11.464216630 -0700
+@@ -12,6 +12,7 @@
+ #include <linux/string.h>
+ #include <linux/nls.h>
+ #include <linux/errno.h>
++#include <asm/unaligned.h>
+ 
+ static const wchar_t charset2uni[256] = {
+ 	/* 0x00*/
+@@ -227,8 +228,8 @@
+ 
+ static int char2uni(const unsigned char *rawstring, int boundlen, wchar_t *uni)
+ {
+-	*uni = charset2uni[*rawstring];
+-	if (*uni == 0x0000)
++	put_unaligned((wchar_t)charset2uni[*rawstring], uni);
++	if (get_unaligned(uni) == 0x0000)
+ 		return -EINVAL;
+ 	return 1;
+ }
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/fs/nls/nls_utf8.c linux-2.6.29/fs/nls/nls_utf8.c
+--- linux-2.6.29.ref/fs/nls/nls_utf8.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/fs/nls/nls_utf8.c	2010-11-02 15:56:11.464216630 -0700
+@@ -8,6 +8,7 @@
+ #include <linux/string.h>
+ #include <linux/nls.h>
+ #include <linux/errno.h>
++#include <asm/unaligned.h>
+ 
+ static unsigned char identity[256];
+ 
+@@ -27,7 +28,7 @@
+ 	int n;
+ 
+ 	if ( (n = utf8_mbtowc(uni, rawstring, boundlen)) == -1) {
+-		*uni = 0x003f;	/* ? */
++		put_unaligned((wchar_t)0x003f, uni); /* ? */
+ 		n = -EINVAL;
+ 	}
+ 	return n;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/fib_rules.h linux-2.6.29/include/linux/fib_rules.h
+--- linux-2.6.29.ref/include/linux/fib_rules.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/fib_rules.h	2010-11-02 15:56:11.464216630 -0700
+@@ -26,7 +26,7 @@
+ 	__u8		action;
+ 
+ 	__u32		flags;
+-};
++} __attribute__ ((packed));
+ 
+ enum
+ {
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/icmp.h linux-2.6.29/include/linux/icmp.h
+--- linux-2.6.29.ref/include/linux/icmp.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/icmp.h	2010-11-02 15:56:11.464216630 -0700
+@@ -80,7 +80,7 @@
+ 		__be16	mtu;
+ 	} frag;
+   } un;
+-};
++} __attribute__ ((packed));
+ 
+ #ifdef __KERNEL__
+ #include <linux/skbuff.h>
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/if_arp.h linux-2.6.29/include/linux/if_arp.h
+--- linux-2.6.29.ref/include/linux/if_arp.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/if_arp.h	2010-11-02 15:56:11.464216630 -0700
+@@ -150,7 +150,7 @@
+ 	unsigned char		ar_tip[4];		/* target IP address		*/
+ #endif
+ 
+-};
++} __attribute__ ((packed));
+ 
+ #ifdef __KERNEL__
+ #include <linux/skbuff.h>
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/igmp.h linux-2.6.29/include/linux/igmp.h
+--- linux-2.6.29.ref/include/linux/igmp.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/igmp.h	2010-11-02 15:56:11.464216630 -0700
+@@ -33,7 +33,7 @@
+ 	__u8 code;		/* For newer IGMP */
+ 	__sum16 csum;
+ 	__be32 group;
+-};
++} __attribute__ ((packed));
+ 
+ /* V3 group record types [grec_type] */
+ #define IGMPV3_MODE_IS_INCLUDE		1
+@@ -49,7 +49,7 @@
+ 	__be16	grec_nsrcs;
+ 	__be32	grec_mca;
+ 	__be32	grec_src[0];
+-};
++} __attribute__ ((packed));
+ 
+ struct igmpv3_report {
+ 	__u8 type;
+@@ -58,7 +58,7 @@
+ 	__be16 resv2;
+ 	__be16 ngrec;
+ 	struct igmpv3_grec grec[0];
+-};
++} __attribute__ ((packed));
+ 
+ struct igmpv3_query {
+ 	__u8 type;
+@@ -79,7 +79,7 @@
+ 	__u8 qqic;
+ 	__be16 nsrcs;
+ 	__be32 srcs[0];
+-};
++} __attribute__ ((packed));
+ 
+ #define IGMP_HOST_MEMBERSHIP_QUERY	0x11	/* From RFC1112 */
+ #define IGMP_HOST_MEMBERSHIP_REPORT	0x12	/* Ditto */
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/ip.h linux-2.6.29/include/linux/ip.h
+--- linux-2.6.29.ref/include/linux/ip.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/ip.h	2010-11-02 15:56:11.464216630 -0700
+@@ -102,7 +102,7 @@
+ 	__be32	saddr;
+ 	__be32	daddr;
+ 	/*The options start here. */
+-};
++} __attribute__ ((packed));
+ 
+ #ifdef __KERNEL__
+ #include <linux/skbuff.h>
+@@ -125,25 +125,25 @@
+ 	__be32 spi;
+ 	__be32 seq_no;		/* Sequence number */
+ 	__u8  auth_data[0];	/* Variable len but >=4. Mind the 64 bit alignment! */
+-};
++} __attribute__ ((packed));
+ 
+ struct ip_esp_hdr {
+ 	__be32 spi;
+ 	__be32 seq_no;		/* Sequence number */
+ 	__u8  enc_data[0];	/* Variable len but >=8. Mind the 64 bit alignment! */
+-};
++} __attribute__ ((packed));
+ 
+ struct ip_comp_hdr {
+ 	__u8 nexthdr;
+ 	__u8 flags;
+ 	__be16 cpi;
+-};
++} __attribute__ ((packed));
+ 
+ struct ip_beet_phdr {
+ 	__u8 nexthdr;
+ 	__u8 hdrlen;
+ 	__u8 padlen;
+ 	__u8 reserved;
+-};
++} __attribute__ ((packed));
+ 
+ #endif	/* _LINUX_IP_H */
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/ipv6.h linux-2.6.29/include/linux/ipv6.h
+--- linux-2.6.29.ref/include/linux/ipv6.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/ipv6.h	2010-11-02 15:56:11.464216630 -0700
+@@ -45,7 +45,7 @@
+ 	 *	type specific data
+ 	 *	variable length field
+ 	 */
+-};
++} __attribute__ ((packed));
+ 
+ 
+ struct ipv6_opt_hdr {
+@@ -73,7 +73,7 @@
+ 	struct in6_addr		addr[0];
+ 
+ #define rt0_type		rt_hdr.type
+-};
++} __attribute__ ((packed));
+ 
+ /*
+  *	routing header type 2
+@@ -85,7 +85,7 @@
+ 	struct in6_addr		addr;
+ 
+ #define rt2_type		rt_hdr.type
+-};
++} __attribute__ ((packed));
+ 
+ /*
+  *	home address option in destination options header
+@@ -122,7 +122,7 @@
+ 
+ 	struct	in6_addr	saddr;
+ 	struct	in6_addr	daddr;
+-};
++} __attribute__ ((packed));
+ 
+ #ifdef __KERNEL__
+ /*
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/netfilter/nf_conntrack_pptp.h linux-2.6.29/include/linux/netfilter/nf_conntrack_pptp.h
+--- linux-2.6.29.ref/include/linux/netfilter/nf_conntrack_pptp.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/netfilter/nf_conntrack_pptp.h	2010-11-02 15:56:11.464216630 -0700
+@@ -57,7 +57,7 @@
+ 	__u16	packetLength;
+ 	__be16	packetType;
+ 	__be32	magicCookie;
+-};
++} __attribute__ ((packed));
+ 
+ /* PptpControlMessageType values */
+ #define PPTP_START_SESSION_REQUEST	1
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/netfilter/nf_conntrack_proto_gre.h linux-2.6.29/include/linux/netfilter/nf_conntrack_proto_gre.h
+--- linux-2.6.29.ref/include/linux/netfilter/nf_conntrack_proto_gre.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/netfilter/nf_conntrack_proto_gre.h	2010-11-02 15:56:11.464216630 -0700
+@@ -50,7 +50,7 @@
+ #error "Adjust your <asm/byteorder.h> defines"
+ #endif
+ 	__be16	protocol;
+-};
++} __attribute__ ((packed));
+ 
+ /* modified GRE header for PPTP */
+ struct gre_hdr_pptp {
+@@ -62,7 +62,7 @@
+ 	__be32 seq;		/* sequence number.  Present if S==1 */
+ 	__be32 ack;		/* seq number of highest packet recieved by */
+ 				/*  sender in this session */
+-};
++} __attribute__ ((packed));
+ 
+ struct nf_ct_gre {
+ 	unsigned int stream_timeout;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/tcp.h linux-2.6.29/include/linux/tcp.h
+--- linux-2.6.29.ref/include/linux/tcp.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/tcp.h	2010-11-02 15:56:11.464216630 -0700
+@@ -54,7 +54,7 @@
+ 	__be16	window;
+ 	__sum16	check;
+ 	__be16	urg_ptr;
+-};
++} __attribute__ ((packed));
+ 
+ /*
+  *	The union cast uses a gcc extension to avoid aliasing problems
+@@ -64,7 +64,7 @@
+ union tcp_word_hdr { 
+ 	struct tcphdr hdr;
+ 	__be32 		  words[5];
+-}; 
++} __attribute__ ((packed));
+ 
+ #define tcp_flag_word(tp) ( ((union tcp_word_hdr *)(tp))->words [3]) 
+ 
+@@ -197,12 +197,12 @@
+ struct tcp_sack_block_wire {
+ 	__be32	start_seq;
+ 	__be32	end_seq;
+-};
++} __attribute__ ((packed));
+ 
+ struct tcp_sack_block {
+ 	u32	start_seq;
+ 	u32	end_seq;
+-};
++} __attribute__ ((packed));
+ 
+ struct tcp_options_received {
+ /*	PAWS/RTTM data	*/
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/udp.h linux-2.6.29/include/linux/udp.h
+--- linux-2.6.29.ref/include/linux/udp.h	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/include/linux/udp.h	2010-11-02 15:56:11.464216630 -0700
+@@ -24,7 +24,7 @@
+ 	__be16	dest;
+ 	__be16	len;
+ 	__sum16	check;
+-};
++} __attribute__ ((packed));
+ 
+ /* UDP socket options */
+ #define UDP_CORK	1	/* Never send partially complete segments */
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/net/ipv4/tcp_input.c linux-2.6.29/net/ipv4/tcp_input.c
+--- linux-2.6.29.ref/net/ipv4/tcp_input.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/net/ipv4/tcp_input.c	2010-11-02 15:56:11.464216630 -0700
+@@ -3786,13 +3786,13 @@
+ {
+ 	__be32 *ptr = (__be32 *)(th + 1);
+ 
+-	if (*ptr == htonl((TCPOPT_NOP << 24) | (TCPOPT_NOP << 16)
++	if (get_unaligned(ptr) == htonl((TCPOPT_NOP << 24) | (TCPOPT_NOP << 16)
+ 			  | (TCPOPT_TIMESTAMP << 8) | TCPOLEN_TIMESTAMP)) {
+ 		tp->rx_opt.saw_tstamp = 1;
+ 		++ptr;
+-		tp->rx_opt.rcv_tsval = ntohl(*ptr);
++		tp->rx_opt.rcv_tsval = ntohl(get_unaligned(ptr));
+ 		++ptr;
+-		tp->rx_opt.rcv_tsecr = ntohl(*ptr);
++		tp->rx_opt.rcv_tsecr = ntohl(get_unaligned(ptr));
+ 		return 1;
+ 	}
+ 	return 0;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/net/ipv4/xfrm4_policy.c linux-2.6.29/net/ipv4/xfrm4_policy.c
+--- linux-2.6.29.ref/net/ipv4/xfrm4_policy.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/net/ipv4/xfrm4_policy.c	2010-11-02 15:56:11.464216630 -0700
+@@ -139,8 +139,8 @@
+ 			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
+ 				__be16 *ports = (__be16 *)xprth;
+ 
+-				fl->fl_ip_sport = ports[!!reverse];
+-				fl->fl_ip_dport = ports[!reverse];
++				fl->fl_ip_sport = get_unaligned(&ports[!!reverse]);
++				fl->fl_ip_dport = get_unaligned(&ports[!reverse]);
+ 			}
+ 			break;
+ 
+@@ -157,7 +157,7 @@
+ 			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
+ 				__be32 *ehdr = (__be32 *)xprth;
+ 
+-				fl->fl_ipsec_spi = ehdr[0];
++				fl->fl_ipsec_spi = get_unaligned(&ehdr[0]);
+ 			}
+ 			break;
+ 
+@@ -165,7 +165,7 @@
+ 			if (pskb_may_pull(skb, xprth + 8 - skb->data)) {
+ 				__be32 *ah_hdr = (__be32*)xprth;
+ 
+-				fl->fl_ipsec_spi = ah_hdr[1];
++				fl->fl_ipsec_spi = get_unaligned(&ah_hdr[1]);
+ 			}
+ 			break;
+ 
+@@ -173,7 +173,7 @@
+ 			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
+ 				__be16 *ipcomp_hdr = (__be16 *)xprth;
+ 
+-				fl->fl_ipsec_spi = htonl(ntohs(ipcomp_hdr[1]));
++				fl->fl_ipsec_spi = htonl(ntohs(get_unaligned(&ipcomp_hdr[1])));
+ 			}
+ 			break;
+ 		default:
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/net/netfilter/ipvs/ip_vs_proto_ah_esp.c linux-2.6.29/net/netfilter/ipvs/ip_vs_proto_ah_esp.c
+--- linux-2.6.29.ref/net/netfilter/ipvs/ip_vs_proto_ah_esp.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/net/netfilter/ipvs/ip_vs_proto_ah_esp.c	2010-11-02 15:56:11.464216630 -0700
+@@ -31,7 +31,7 @@
+ 	__u8		flags;
+ 	__u32		msgid;
+ 	__u32		length;
+-};
++} __attribute__ ((packed));
+ 
+ */
+ 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/net/sunrpc/xprtsock.c linux-2.6.29/net/sunrpc/xprtsock.c
+--- linux-2.6.29.ref/net/sunrpc/xprtsock.c	2010-11-02 15:55:00.000000000 -0700
++++ linux-2.6.29/net/sunrpc/xprtsock.c	2010-11-02 15:56:11.464216630 -0700
+@@ -40,6 +40,8 @@
+ #include <net/udp.h>
+ #include <net/tcp.h>
+ 
++#include <asm/unaligned.h>
++
+ /*
+  * xprtsock tunables
+  */
+@@ -868,10 +870,10 @@
+ 				sizeof(_xid), &_xid);
+ 	if (xp == NULL)
+ 		goto dropit;
+-
++	
+ 	/* Look up and lock the request corresponding to the given XID */
+ 	spin_lock(&xprt->transport_lock);
+-	rovr = xprt_lookup_rqst(xprt, *xp);
++	rovr = xprt_lookup_rqst(xprt, get_unaligned(xp));
+ 	if (!rovr)
+ 		goto out_unlock;
+ 	task = rovr->rq_task;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/README.1020.unaligned.patch linux-2.6.29/README.1020.unaligned.patch
+--- linux-2.6.29.ref/README.1020.unaligned.patch	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/README.1020.unaligned.patch	2010-11-02 15:57:41.715039442 -0700
+@@ -0,0 +1,20 @@
++Feature:
++--------
++Patch the kernel to reduce the occurrence of ADE exception
++
++Prerequisite patch numbers:
++---------------------------
++0000
++1000
++1001
++
++Primary author:
++---------------
++YH Lin
++
++Related to which chip version SMP86xx xx=?
++-----------------------------------------
++Tango3 ES3 or above
++
++(linux patches) which CONFIG_... are provided:
++----------------------------------------------

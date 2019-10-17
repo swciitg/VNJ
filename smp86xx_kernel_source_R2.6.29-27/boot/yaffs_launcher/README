@@ -1,0 +1,437 @@
+----------------------------------------
+Purpose:
+----------------------------------------
+This applet is provided as a basic implementation of YAFFS in use within a
+bootloader-like environment.  It is designed to read from a YAFFS partition on
+the NAND, and launch an executable image from it.  This applet should be
+launched by ezboot, and then in turn this applet will launch the next stage.
+
+The purpose of having a separate applet, rather than integrating this capability
+directly into ezboot, is due to licensing concerns. YAFFS is dual-license,
+available under the GPL, or under license acquired from Aleph One Limited. If
+Sigma Designs were to acquire a license, that would allow us to keep our code
+proprietary. However, we want to be able to distribute the code to our
+customers, which complicates matters, because even with our own license, if we
+provide it to customers, each customer would still need to acquire their own
+Aleph One license.
+
+That being the case, there is no point for Sigma Designs to acquire that license
+except to avoid making Sigma proprietary code GPL. Hence, the solution was to
+create a separate applet that contains as little of Sigma Design's proprietary
+code as possible, and distribute that customers. This code could become GPL
+without exposing Sigma proprietary code, rendering moot the need for an Aleph
+One license.
+
+This version of the YAFFS Launcher Applet does not have the ability to load
+and authenticate payloads signed/encrypted in Sigma's proprietary xload format.
+Instead, it uses the `boot_auth` mechanism.  You can find this in the cs_rootfs
+package, under cs_rootfs/package/sigma-apps/boot_auth/.
+
+The customers are then expected to acquire their own licenses from Aleph One,
+if they wish to use the Sigma Design's proprietary xload format for
+authentication, or if they wish to keep their own source code proprietary.
+If customers want to use the xload format, they can integrate the source code
+for authentication, which they can get from the Sigma Designs SDK.  Once they
+have the Aleph One license, they can utilize the YAFFS source code in their
+products, and keep the source code confidential, honoring both their NDA with
+Sigma Designs and the YAFFS licensing.
+
+
+
+----------------------------------------
+Preparing the Package:
+----------------------------------------
+Grab the yaffs2/ source tree from the aleph1 git repository.
+
+For convenience, a yaffs2 source code tarball is included.  The snapshot used
+for this build was taken from 2010-10-21.
+
+Then patch it:
+$ patch -p1 -d yaffs2/ < yaffs2_SigmaBootloader.patch
+
+Next, you'll choose whether to enable the boot_auth authentication mechanism.
+In the Makefile, you'll see this variable:
+  USE_BOOT_AUTH
+
+If you wish to use boot_auth, this variable should be set to 'y':
+  USE_BOOT_AUTH := y
+
+Set it to 'n' to disable it, allowing the load and execution of unsigned
+payloads.
+
+
+
+----------------------------------------
+Specifying the boot_auth public key:
+----------------------------------------
+
+If you enable the boot_auth authentication mechanism, then follow the steps
+given in the cs_rootfs/package/sigma-apps/boot_auth/README file to
+generate/extract your public key and place it into a plain little-Endian binary
+image.
+
+Assuming you have your RSA key in PEM format in mykey.pem, then to extract the
+public key into the proper binary format, the command line should be similar to:
+
+$ openssl asn1parse <mykey.pem | head -n 3 | tail -n 1 | cut -d':' -f4 | \
+	xargs tobin.bash > mykey.pub
+
+You should get an image called mykey.pub. Copy this into your YAFFS build
+directory (your /path/to/kernel/source/boot/yaffs_launcher/ directory). It will
+now be built into the applet if USE_BOOT_AUTH is enabled. 
+
+
+
+----------------------------------------
+Compilation:
+----------------------------------------
+Set up your environment and RMCFLAGS like so:
+$ source set_rua_test/build_configs/tango3_iptv_facsprod_cs.env
+
+Then, just run `make`.  You will get a zbimage xload ROMFS,
+`zbimage-yaffs_launcher-xload`, which you can flash to the NAND of your board.
+This is a standard boot container much like the YAMON or Linux zbimage xload ROMFS's.
+
+You can also select the option of building the code in mips16 mode, to save on
+code space.  You do this by passing the option of MIPS16=on to `make`:
+$ make MIPS16=on
+
+
+
+----------------------------------------
+Known Issues:
+----------------------------------------
+* If you are building this applet for the new MLC HW NAND controller (used on 8656
+  and 8646), you cannot compile it in mips16 mode.  Only mips32 mode will work.
+* We skip checkpoint reading/writing, there is a bug caused by trying to mount the
+  partition by reading a checkpoint, so we work-around it for now.
+
+
+----------------------------------------
+Preparing YAFFS partition and materials:
+----------------------------------------
+Before proceeding, you will need the ezboot/zxenv phyblock
+(phyblock0-0x20000padded.<board_id>) and YAMON (zbimage-yamon-<version>) images
+for your board. Refer to Tango3 Bring-up Tutorial for instructions on how to
+build these images.
+
+    ------------------------------------
+    Erasing and Reformatting the NAND,
+    burning ezboot and YAMON back on:
+    ------------------------------------
+
+You may need to reformat your NAND flash, creating a reserved physical zone in
+which the YAFFS partition can reside, if such a reserved physical zone does not
+already exist. Alternatively, you can simply wipe out the NAND flash and have no
+Sigma NAND library partition at all. You can carry out this operation from
+YAMON, for example, given a 512MB NAND flash:
+
+# Raw erase and wipe it all out:
+YAMON> nflash erase -r 0 4096 0
+
+If you wish to have a Sigma NAND library partition, you'll then need to do a
+format operation. Otherwise you can skip this step. For example, if you have a
+512MB NAND flash, and wish to reserve the first 384 MB for YAFFS (and have
+128MB for the Sigma NAND Library partition), you would do this:
+
+# Format the flash, reserving 3072 blocks (384 MB)
+YAMON> nflash format rz=3072 0
+
+
+Next, you will need to flash the physical block image back onto the board. You
+will need a version of ezboot running on your board, version >= 0xb0. If you
+chose to have no Sigma NAND library partition, you'll need to make sure you
+modify your ZXENV when building the physical block image, so that you can launch
+YAMON from the virtual zone. For example, you can modify the ZXENV to set
+z.boot0 = 0x000c0000, and z.boot0_in_virtualzone = 1, and then burn YAMON to
+0x000c0000. If you also want to burn Linux and you didn't create a Sigma NAND
+library partition, you'll also want to modify z.boot1, setting it 0x00100000,
+and then add the key z.boot1_in_virtual_zone = 1.
+
+Take your physical block image, and then burn this to physical block#0, and make
+backups at #1, #2, and #3. Refer to Tango3 Bring-up Tutorial for instructions on
+how to flash the software components to your board.
+
+Finally, you will want to download and burn YAMON. If you created a Sigma NAND
+library partition, you can burn it to the logical zone, which should be 0x80000
+by the default Sigma Reference board NAND map. Otherwise, you can burn it to the
+virtual address that you set z.boot0 to. If you followed the example above, you
+would burn YAMON to virtual address 0x000c0000, which you can do from YAMON as
+follows:
+
+# Assuming you've loaded the YAMON zbimage to memory at 0xa7000000:
+YAMON> nflash write -v 0xc0000 0xa7000000 0x40000 0
+
+When you reboot your system, it should boot to YAMON. For development purposes,
+you will at least have a surefire way to boot to YAMON, so that even if the
+YAFFS applet does not work properly for you, you can still boot up.
+
+    ------------------------------------
+    Preparing a Linux kernel with YAFFS
+    support:
+    ------------------------------------
+
+Next, you will want to build a Linux kernel that has YAFFS support. Follow the
+instructions for building the kernel in the Tango3 Bring-up Tutorial, but during
+part 2, also do the following steps in the menu configuration:
+
+   1. Configure Machine Selection for your target
+   2. Enable Device Drivers then hit enter
+          * Set "Memory Technology Device (MTD) Support" to <M> then hit enter
+                o Enable "MTD partitioning support"
+                o Enable "Direct char device access to MTD devices"
+                o Enable "Caching block device access to MTD devices"
+                o Enable "NAND Device Support" then hit enter
+                      + Enable "TANGOX NAND Device Support" then exit back to
+                        "Linux Kernel Configuration" 
+   3. Enter File systems
+          * Enable "Miscellaneous" then hit enter
+                o Set "YAFFS2 file system support" to <M> then exit the menu
+                  configuration 
+
+Once you have built it, you don't necessarily need to burn it, you can always
+use TFTP to load and run the kernel. However, if you wish, you can also burn
+that to the NAND flash as well. If you created a Sigma NAND library partition,
+you can burn to boot container#1 (logical address of 0xc0000). If not, you can
+burn it to the virtual zone just after YAMON, at virtual address 0x100000.
+
+    ------------------------------------
+    Setting up ZXENV keys to partition
+    the reserved physical space:
+    ------------------------------------
+
+Now, setup some XENV keys related to the reserved physical zone. First, you will
+want to set the key a.cs0_rsvd_pblk to the number of blocks you reserved. Then,
+if you set aside a partition for the Sigma NAND library, you will need to adjust
+the logical partition map so it still fits within the remaining amount of space.
+Finally, you will define partitions in the reserved physical zone. See the
+example below, which (for the sake of simplification) assumes that you did
+create a Sigma NAND library partition: 
+
+# Setting the bound for the number of reserved physical blocks
+YAMON> setxenv -b a.cs0_rsvd_pblk 3072
+# Adjust logical partitions by deleting partition 6 and 7
+YAMON> unsetxenv l.cs0_part7_size
+YAMON> unsetxenv l.cs0_part7_offset
+YAMON> unsetxenv l.cs0_part6_size
+YAMON> unsetxenv l.cs0_part6_offset
+YAMON> setxenv -b l.cs0_parts 5
+# Define partitions in reservation zone
+YAMON> setxenv -b a.cs0_pblk_part1_offset 0
+YAMON> setxenv -b a.cs0_pblk_part1_size 0x00080000
+YAMON> setxenv -b a.cs0_pblk_part2_offset 0x00080000
+YAMON> setxenv -b a.cs0_pblk_part2_size 0x00780000
+YAMON> setxenv -b a.cs0_pblk_part3_offset 0x00800000
+YAMON> setxenv -b a.cs0_pblk_part3_size 0x17800000
+YAMON> setxenv -b a.cs0_pblk_parts 3
+YAMON> setxenv a.cs0_pblk_part1_name "bootblocks"
+YAMON> setxenv a.cs0_pblk_part2_name "system"
+YAMON> setxenv a.cs0_pblk_part3_name "userdata"
+# Save it
+YAMON> $commit
+
+Once that's setup, you can boot to Linux, and once you're there, execute the following
+(the prompt is represented by lines starting with a '$', comments begin with '#'):
+# Load the low-level NAND driver.
+$ modprobe smp86xx_nand
+[SMP_NAND] SMP86xx NAND Driver 0.2
+[SMP_NAND]: checking NAND device on CS0 ..
+NAND device: Manufacturer ID: 0x20, Chip ID: 0xdc (ST Micro NAND 512MiB 3,3V 8-bit)
+Scanning device for bad blocks
+Bad eraseblock 5 at 0x0000000a0000
+Bad eraseblock 192 at 0x000001800000
+Bad eraseblock 430 at 0x0000035c0000
+Bad eraseblock 432 at 0x000003600000
+[SMP_NAND]: detected NAND on CS0, erasesize 131072, pagesize 2048, oobsize 64, oobavail 46
+[SMP_NAND]: checking NAND device on CS1 ..
+No NAND device found!!!
+[SMP_NAND]: detection completed, load partition information from XENV ..
+[SMP_NAND]: load partition information for CS0 ..
+Creating 3 MTD partitions on "NAND 512MiB 3,3V 8-bit":
+0x000000000000-0x000000080000 : "bootblocks"
+0x000000080000-0x000000800000 : "system"
+0x000000800000-0x000018000000 : "userdata"
+$ cat /proc/mtd
+dev:    size   erasesize  name
+mtd0: 18000000 00020000 "NAND 512MiB 3,3V 8-bit"
+mtd1: 00080000 00020000 "bootblocks"
+mtd2: 00780000 00020000 "system"
+mtd3: 17800000 00020000 "userdata"
+# Load the MTD driver and YAFFS
+$ modprobe mtdblock
+$ modprobe yaffs
+yaffs Oct  4 2010 16:25:10 Installing. 
+$ ll /dev/mtdblock*
+brw-r--r--    1 root     root      31,   0 Oct  4  2010 /dev/mtdblock0
+brw-r--r--    1 root     root      31,   1 Oct  4  2010 /dev/mtdblock1
+brw-r--r--    1 root     root      31,  10 Oct  4  2010 /dev/mtdblock10
+brw-r--r--    1 root     root      31,  11 Oct  4  2010 /dev/mtdblock11
+brw-r--r--    1 root     root      31,  12 Oct  4  2010 /dev/mtdblock12
+brw-r--r--    1 root     root      31,  13 Oct  4  2010 /dev/mtdblock13
+brw-r--r--    1 root     root      31,  14 Oct  4  2010 /dev/mtdblock14
+brw-r--r--    1 root     root      31,  15 Oct  4  2010 /dev/mtdblock15
+brw-r--r--    1 root     root      31,   2 Oct  4  2010 /dev/mtdblock2
+brw-r--r--    1 root     root      31,   3 Oct  4  2010 /dev/mtdblock3
+brw-r--r--    1 root     root      31,   4 Oct  4  2010 /dev/mtdblock4
+brw-r--r--    1 root     root      31,   5 Oct  4  2010 /dev/mtdblock5
+brw-r--r--    1 root     root      31,   6 Oct  4  2010 /dev/mtdblock6
+brw-r--r--    1 root     root      31,   7 Oct  4  2010 /dev/mtdblock7
+brw-r--r--    1 root     root      31,   8 Oct  4  2010 /dev/mtdblock8
+brw-r--r--    1 root     root      31,   9 Oct  4  2010 /dev/mtdblock9
+# Mount the "userdata" partition:
+$ mount -t yaffs2 -o inband-tags /dev/mtdblock3 /mnt
+yaffs: dev is 32505859 name is "mtdblock3"
+yaffs: passed flags "inband-tags"
+yaffs: Attempting MTD mount on 31.3, "mtdblock3"
+yaffs: restored from checkpoint
+yaffs_read_super: isCheckpointed 1
+
+
+Note especially the use of inband tags here!
+
+Next, you should take a gzipped executable image, such as YAMON or Linux, and
+write it to that file system. For example, you could take vmlinux.gz and write
+it to /mnt, or you could write a yamon-02.13-SIGMADESIGNS-<version>_el.bin.gz
+image.
+
+If you wish to use boot_auth, you'll need to also generate the signature of that
+file, and write that to the file system. It is implicitly assumed that the
+signature's filename should be the payload's filename with .sig appended to it.
+So for example, the signature of vmlinux.gz would be vmlinux.gz.sig.
+
+Do not forget to sync and umount after you are finished. 
+
+
+
+----------------------------------------
+Procedure to flash the applet and ready
+it for execution by ezboot:
+----------------------------------------
+Choose a location to flash the applet.  One possible choice, given the NAND
+flash layout of a typical Sigma Designs reference board, would be
+logical address 0x00000000.  This is pointed to by boot container#2, which
+is the ZXENV key "z.boot2", which by default is set to a value of 0x00000000.
+
+Then, you'll need to setup some additional ZXENV keys to pass the appropriate
+parameters to the applet.  Shown below are some example values and descriptions:
+  * z.boot2_yaffs_startblock = 64
+      The block number where the YAFFS partition starts
+  * z.boot2_yaffs_endblock = 3072
+      The block number where the YAFFS partition ends, inclusive (that is, it
+      includes the given block number in the partition). 
+  * z.boot2_yaffs_numblocks = 3009   (NOTE: only supported starting from Release
+                                      3.12.0 onward!)
+      The number of blocks in this YAFFS partition. This is an alternative way
+      of specifying the partition boundaries, instead of using the
+      z.boot2_yaffs_endblock key, which may be somewhat ambiguous for some. This
+      key takes precedence over the z.boot0_yaffs_endblock key!
+  * z.boot2_yaffs_path = /yaffs/vmlinux.gz
+      Path to the file you want to read and launch.  Note that the "/yaffs/" portion
+      of the path is there because the YAFFS partition is mounted as "/yaffs/" in
+      the launcher applet code, in yaffs2/direct/basic-test/yaffscfg2k.c.  You can
+      modify this to suit your own needs, even to mount multiple partitions.
+  * z.boot2_yaffs_flags = 0x00000001
+      Flags. This is a bitfield:
+        Bit 0 - If set, this payload is gzipped
+        Bit 1 - If set, this payload is encrypted
+        Bit 2 - If set, this payload should be executed
+  * z.boot2_yaffs_loadaddr = 0x84000000
+      Address to load the image to
+  * z.boot2_yaffs_startaddr = 0x84000000
+      Address to execute the image
+
+You can use YAMON to add these values to the ZXENV.  ezboot will read these
+values and pass them along as arguments to the YAFFS launcher applet.
+
+Note that the applet as distributed to customers by Sigma Designs does not use
+the Sigma Designs proprietary authentication/decryption engine used with the
+xload format. Instead, it features the boot_auth authentication mechanism.
+
+Any customer who wishes to use the Sigma Designs xload format needs to first
+acquire the YAFFS license from Aleph One Limited, and then integrate support
+into the applet on their own, once the code can be kept confidential. See the
+section below on Integration.
+
+Keep in mind that this isn't strictly necessary for image authentication, as you
+can choose to use boot_auth instead.
+
+
+
+----------------------------------------
+Technique for getting the YAFFS launcher
+applet to launch a different image, or
+read from a different partition:
+----------------------------------------
+If you want the YAFFS launcher applet to launch a different image
+or read from a different partition, you can utilize ezboot's "boot container"
+mechanism to setup another boot container, pointing to the same applet, but with
+a different set of parameters.  For example, if you want boot container 3 to run
+the launcher applet and have the launcher applet run YAMON, you could do this:
+YAMON> setxenv -b z.boot3 0x00000000
+YAMON> setxenv -b z.boot3_yaffs_startblock 64
+YAMON> setxenv -b z.boot3_yaffs_endblock 3072
+YAMON> setxenv z.boot2_yaffs_path /yaffs/yamon.bin.gz
+YAMON> setxenv -b z.boot2_yaffs_flags 0x00000001
+YAMON> setxenv -b z.boot2_yaffs_loadaddr 0x85200000
+YAMON> setxenv -b z.boot2_yaffs_startaddr 0x85200000
+
+
+
+----------------------------------------
+Technique for burning the applet to the
+virtual zone (reserved physical zone),
+and launching it from there:
+----------------------------------------
+Also, if you want to burn the YAFFS launcher to the reserved physical zone, and
+get ezboot to launch it from there, you can do so by setting the ZXENV key
+"z.bootN_in_virtualzone", where N is the boot container number. For example,
+let's burn the applet to virtual address 0x80000, assuming you had the image
+loaded into memory at virtual address 0xa7000000:
+YAMON> nflash write -v 0x80000 0xa7000000 0x20000 0
+
+Then you could setup boot container #3 to point there like this:
+YAMON> setxenv -b z.boot3 0x00080000
+YAMON> setxenv -b z.boot3_in_virtualzone 1
+YAMON>
+YAMON> setxenv -b z.boot3_yaffs_startblock 64
+YAMON> setxenv -b z.boot3_yaffs_endblock 3072
+# (alternatively, you could set "z.boot2_yaffs_numblocks")
+YAMON> setxenv -b z.boot2_yaffs_numblocks 3009
+
+YAMON> setxenv z.boot2_yaffs_path /yaffs2/yamon.bin.gz
+YAMON> setxenv -b z.boot2_yaffs_flags 0x00000001
+YAMON> setxenv -b z.boot2_yaffs_loadaddr 0x85200000
+YAMON> setxenv -b z.boot2_yaffs_startaddr 0x85200000
+
+
+
+----------------------------------------
+Integration:
+----------------------------------------
+Sigma Designs deliberately excludes much of the code from its own SDK in
+packaging this applet, to avoid licensing concerns and avoid making Sigma
+proprietary code into GPL code.
+
+One important missing ingredient is the xload format authentication mechanism.
+Customers may use the boot_auth mechanism as an alternative, but if they really
+wish to use the Sigma Designs proprietary xload format, they can still do so.
+
+This applet is designed to serve as a reference for customers to integrate
+it themselves.  Customers are expected to acquire their own license for YAFFS,
+and to then integrate YAFFS with the Sigma SDK to get other necessary components.
+
+Among these components are:
+   * XENV-handling code.
+   * `xkc` and `ikc` code (channels and xloads), for authentication purposes, and
+     for splashscreen materials.
+
+The idea is that, once a customer has acquired a YAFFS license, they do not need to
+expose their code to anyone else, and they can then use YAFFS directly with ezboot
+and YAMON.  Instead of passing in parameters, they can read XENV keys directly from
+the YAFFS code.
+
+There is a <NOTE> section in the yaffs_launcher.c code, where you will need to
+hook it up to code that can do authentication. If you use the xload format, then
+you can look at the ezboot source code as a reference, in particular the files
+xload.c, xload.h, and xos2k_client.c. You can see the file zboot.c as an example
+of how to call the functions in xload.c.

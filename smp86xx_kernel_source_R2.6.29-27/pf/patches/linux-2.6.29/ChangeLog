@@ -1,0 +1,570 @@
+
+2009-07-07  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Create initial patch set based on 2.6.29.5.
+	* [YH] Update to 2.6.29.6.
+
+2009-07-24  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Initial Tango2/Tango3 merge is done.
+
+2009-07-27  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Initial Tango2/Tango3 kernel core is up and running.
+
+2008-07-28  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Adding support for Tango3 enet.
+
+2009-07-29  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Tango3 watchdog timer support.
+	* [YH] Adding support for Tango2 enet.
+	* [YH] Initial PCI and DMA support for Tango2/Tango3.
+
+2009-07-30 YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Adding support for Tango2/Tango3 USB host.
+	* [YH] Adding support for IR, FIP, SCARD, and UIR.
+
+2009-07-31  Sue Chang <Sue_Chang@sdesigns.com>
+
+	* [Sue] Adding more support for DTCP-IP.
+
+2009-08-03 YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [YH] Adding 1017.ipfilter.patch 1024.multirecv.patch.
+	* [YH] Adding 1018.fb.patch 1020.unaligned.patch 1021.memop.patch.
+	* [Craig] Adding support for Tango3 SATA host.
+
+2009-08-04  YH Lin <YH_Lin@sdesigns.com> Benoit Goby <Benoit_Goby@sdesigns.com>
+
+	* [YH] Initial SDIO PCI host support (back merged from 2.6.30.4).
+	* [Benoit/YH] Merged Android patches.
+
+2008-08-06  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Adding support for Tango3 OTG in device mode.
+
+2008-08-07  Max Lo <Max_Lo@sdesigns.com>
+
+	* [Max] Adding initial SDIO host support for Tango3 based on PCI.
+
+2009-08-10 YH Lin <YH_Lin@sdesigns.com> Max Lo <Max_Lo@sdesigns.com>
+
+	* [Max/YH] Tango3: Support up to two SDIO interfaces.
+
+2009-08-11 YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Updating CPU_HB periodically.
+
+2009-08-20 Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] SCSI CD: fixed problem with some loaders reporting
+	          bad capacity.
+
+2009-08-21 Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 enet: enhance LED for Vitesse PHY.
+
+2009-08-27  YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+	
+	* [YH] More unaligned fixes.
+	* [Craig] SATA optical disc: TOC fix.
+
+2009-08-31 YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Forward compatible with MBUS/Tango4.
+
+2009-09-02 Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Adding Tango2 BMIDE support.
+
+2009-09-03  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] Merged suggestion from MIPS to save up to 15% TLB handling
+	       on 74K.
+
+2009-09-04  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] Fix the problem with the fixed "remap" so kernel can use up to
+	       448MB memory.
+	* [YH] Fix bogus MBUS warning.
+
+2009-09-18  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] Add support for XENV key "a.csX_rsvd_pblk".
+
+2009-09-25  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] Keep USB in reset mode once modules are unloaded.
+
+2009-09-30  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] Adding virtual input driver.
+
+2009-10-07  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 enet: added NOMDIO option.
+
+2009-10-12  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] USB: don't reset USB block on 8652 while unloading modules.
+
+2009-10-13  Sorin Otescu <Sorin_Otescu@sdesigns.com> YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [Sorin/YH] Added DirectFB fusion support.
+
+2009-10-21  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 SATA: support HDD slumber mode.
+
+2009-10-23  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] Add more information to /proc/cpuinfo.
+	* [YH] Increase more "randomness" by adding more IRQF_SAMPLE_RANDOM.
+
+2009-10-28 YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [YH] Adding support for gcc 4.4.x.
+	* [Craig] Better support for HIPM mode on SATA devices.
+
+2009-11-03  Max Lo <Max_Lo@sdesigns.com> 
+	
+	* [Max] Disable SDIO high speed mode due to potential clock issue.
+
+2009-11-04  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] Re-base from MTI branch (2.6.29-4).
+
+2009-11-09  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] If timer0 is not used, use it as one-shot timer (e.g. udelay).
+
+2009-11-10  YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+	
+	* [Craig/YH] Fixed the PCI dma address conversion problem.
+
+2009-11-18  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Removed the previously added IRQF_SAMPLE_RANDOM.
+
+2009-11-30  YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 SATA bug fixes.
+	* [YH] Fixed GPIO register errors for smart card #1.
+
+2009-12-01  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Tango3: temporarily boost the gbus bandwidth for ethernet.
+
+2009-12-05  YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+	
+	* [Craig/YH] Tango3 ENET: better way to stop/restart rx engine. Use
+			much less memory for operations. Deal with some corner
+			cases. No need to boost the bandwidth.
+
+2009-12-10  YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+	
+	* [Craig/YH] Tango3 ENET: reorganize the device driver and improve error
+			handling.
+
+2009-12-14  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Tango3: adding utility for measuring bandwidth usage.
+
+2009-12-16  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: power up/down PHY when needed.
+	* [Craig] SATA: fixed DVD problem (CT-7612)
+
+2009-12-28  YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] SATA: more error handling 
+	* [YH]: certificate usage for 8656/8658.
+
+2009-12-29  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: better overrun handling.
+
+2010-01-04  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Tango3 ENET: determine the avaliability of gigabit support at runtime.
+
+2010-01-12  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: increase gbus bandwidth allocation.
+
+2010-01-15  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Exposing zxenv to user level for read-only operations via /dev/zxenv.
+
+2010-01-26  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: zero'ed out the allocated pages before initialization.
+
+2010-01-27  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] USB: put PHY in reset mode when unloading.
+
+2010-02-03  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Tango3 MBUS: optionally if MBUS channel allocation failed, it can be 
+		put to sleep until the channel is available (i.e. with MBUS_WAIT_QUEUE 
+		defined).
+
+2010-02-10  Paul Lind <plind@mips.com>
+
+	* [Paul] Hook up perf_counter interrupt for oprofile.
+
+2010-02-18  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: Workaround the shutdown/restart problem.
+
+2010-02-23  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] 8658 is now 8656xxA or 8656xxB (xx don't care).
+
+2010-03-02  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Changed from ioctl to unlocked_ioctl for various devices.
+
+2010-03-24  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Experimental NAND MTD support.
+	* [YH] Fixed zxenv __init problem.
+
+2010-03-29  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] SATA: add module parameter to disable port(s).
+
+2010-03-31  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] NAND MTD: corrected errors in managing ECC and enabled AUTOPIO.
+
+2009-04-05  YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [YH] Adding SMP8646.
+	* [Craig] Tango3 ENET: bug#11571 half duplex problem.
+
+2010-04-06  YH Lin <YH_Lin@sdesigns.com> Benoit Goby <Benoit_Goby@sdesigns.com>
+
+	* [YH] NAND MTD: optionally partition name can be given via XENV.
+	* [YH/Benoit]: merge fake RTC implementation from MIPS.
+
+2010-04-08  YH Lin <YH_Lin@sdesigns.com> Benoit Goby <Benoit_Goby@sdesigns.com>
+
+	* [YH/Benoit]: use new character device interface with IR/FIP/UIR/SCARD.
+
+2010-04-13  YH Lin <YH_Lin@sdesigns.com> 
+
+	* [YH] Add support for registering mbus notification without starting 
+	       mbus transfer.
+
+2010-04-20  YH Lin <YH_Lin@sdesigns.com> 
+	
+	* [YH] IR/FIP/SCARD/UIR: wake up reader regardless blocking mode or not.
+
+2010-05-05  YH Lin <YH_Lin@sdesigns.com>  Benjamin Frot <Benjamin_Frot@sdesigns.com>
+	
+	* [YH/Benjamin] Android: merged patch 0156~0248.
+
+2010-05-12  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: use MAC loopback (instead of PHY loopback) to stop
+			RX dma.
+
+2010-05-21  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 OTG bug fix: address conversion.
+
+2010-05-25  YH Lin <YH_Lin@sdesigns.com>
+	
+	* [YH] SDIO: 8646 supports high speed mode.
+
+2010-06-22  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: fix re-arming of TX chain.
+
+2010-06-24  YH Lin <YH_Lin@sdesigns.com>
+	
+	* [YH] Tango3 ENET: reduce CPU utilization during auto negotiation.
+
+2010-06-28  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: power saving when unplugged (Vitesse PHY).
+
+2010-07-12  YH Lin <YH_Lin@sdesigns.com>
+	
+	* [YH] MBUS: workaround MBUS reset problem when system frequency ~= 400MHz.
+	* [YH] By default, the number of partitions in flash is 0 instead of 1.
+
+2010-07-19  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Update xload3 scripts.
+
+2010-07-20  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] No re-entrance of interrupt at the same level.
+
+2010-07-21  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Fix potential virt_to_bus translation errors.
+
+2010-07-26  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] USB: Fix potential race condition with concurrent module loading.
+
+2010-07-30  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] MTD NAND: Fix issue with concurrent access on multiple chips.
+
+2010-08-05  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] No re-entrance of interrupt at the same level from cp0_timer/perfcount.
+
+2010-08-10  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Back out interrupt changes, and clean up the policies accordingly.
+	* [YH] USB: log2_irq_thresh set to 1 by default.
+	
+2010-08-11  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 SATA: corrected tasklet usage.
+
+2010-08-31  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] make sure USB/SATA are properly reset before activate them.
+
+2010-09-02  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Fixed wait_event_interruptible problem when received signal.
+	* [YH] More spinlock protections for critical region (SMP).
+
+2010-09-10  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Fixed PCI DMA memory mapping issues when setting up regions.
+
+2010-09-12  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Better control/tracking of the time by using xtal_in as clocksource.
+	* [YH] Fixed problem re-adjusting clockevent when the frequency changes are detected.
+
+2010-09-17  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 SATA: 1024 bytes PIO restriction only apply to ATAPI device.
+
+2010-09-20  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: re-organized spinlock usage.
+
+2010-09-22  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] GPIO fixes.
+
+2010-09-28  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Tango3 PCI: enable pre-fetchable regions.
+
+2010-10-07  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] CIFS: addressing some alignment issues.
+
+2010-10-18  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Tango4: change of MBUS register address.
+
+2010-10-19  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 SATA: move global data into private data structure, 
+			more clean-ups.
+
+2010-10-20  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Adding YAFFS, which may have conflict with Android -- to be reviewed later.
+
+2010-10-27  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] YAFFS2, default uses inband-tags.
+
+2010-11-03  YH Lin <YH_Lin@sdesigns.com> Daniel Ross <Daniel_Ross@sdesigns.com>
+
+	* [YH] Merge non-architecture dependent codes from 2.6.29.6.
+	* [YH/Daniel] Tango3 MTD driver for SMP8656/8646 and beyond.
+
+2010-11-08  YH Lin <YH_Lin@sdesigns.com> Daniel Ross <Daniel_Ross@sdesigns.com>
+
+	* [YH/Daniel] Use MBUS interrupt for Tango3 MTD driver, timing info
+		can be passed via XENV.
+
+2010-11-10  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Merged customer's patch for fixing the problem that UART buadrate 
+		cannot be changed dynamically.
+
+2010-11-18  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 SDIO: check more details during module unload.
+
+2010-11-19  YH Lin <YH_Lin@sdesigns.com> Daniel Ross <Daniel_Ross@sdesigns.com>
+
+	* [YH/Daniel] Tango3 MTD: fixed CS0 problem. 
+	* [YH] Adding XENV partitions.
+
+2010-11-22  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] Tango3 ENET: no need to send packet CRC upstream.
+
+2010-11-24  Mircea Fedoreanu <Mircea_Fedoreanu@sdesigns.com> Loic Simon <Loic_Simon@sdesigns.com>
+
+	* [Mircea/Loic] Fixed alignment problam with RUA PMEM driver (Android).
+
+2010-11-29  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] More support with SMP867x.
+
+2010-12-02  Yifan Liu <Yifan_Liu@sdesigns.com> YH Lin <YH_Lin@sdesigns.com>
+
+	* [Yifan/YH] Merged the patch that fixes backward compatibility problem due to
+		GPL symbol (http://git.linux-mips.org/?p=linux.git;a=commit;h=7b3e543ddb39b69b75c9c24bb54180eca152f541)
+
+2010-12-03  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig] 8670 USB host/OTG support.
+
+2010-12-07  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] 8670 SDIO: fix timing with high speed mode.
+
+2010-12-09  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] MTD: rename smp86xx to smp8xxx.
+
+2010-12-16  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] MTD: kmalloc buffer instead from stack.
+	* [YH] SDIO: fix section mismatched problem.
+	
+2011-01-06  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] MBUS: more clean-ups on timeout mechanism.
+
+2011-01-13  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] SATA: TX edge rate control can be passed from XENV.
+
+2011-01-20  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] DMA: divided memory into two zones if needed.
+
+2011-01-24  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] MBUS: re-checking the terminating condition with em86xx_mbus_wait.
+
+2011-02-02  YH Lin <YH_Lin@sdesigns.com> Daniel Ross <Daniel_Ross@sdesigns.com>
+
+	* [Daniel] Tango3 MTD: adding new NAND part.
+	* [YH] IR: shared IRQ.
+
+2011-02-04  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Dropping support for Tango4 (use 2.6.32 or above instead).
+
+2011-02-18  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig]: SATA uses IRQF_DISABLED flag.
+
+2011-03-02  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] MBUS: minor re-organized mbus codes.
+
+2011-03-06  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig]: Fix MSDOS partition problem related 4KB sector.
+
+2011-03-11  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] SATA/MBUS: de-couple mbus and SATA interrupt.
+
+2011-03-16  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] NAND MTD: no need to actively doing chip select.
+
+2011-03-18  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] SDIO: add 8670 Rev2.
+
+2011-03-24  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig]: Tango3 ENET: reduce the numbers of interrupt for processing packets.
+
+2011-04-04  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] NAND MTD: bounce buffer cannot be shared by different chips concurrently.
+
+2011-04-07  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig]: Back mergeed EFI partition support from 2.6.32.
+
+2011-04-15  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] delay: simplification and minor bug fixes.
+
+2011-04-20  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig]: fix MAC partition issue with 4KB sector.
+
+2011-04-25  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] added HIGHMEM support -- experimental.
+
+2011-05-04  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] page_alloc: don't spin waiting for memory available if we are in non-switchable context.
+
+2011-05-17  Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig]: Capped the transfer speed of SDIO as well for older chips.
+
+2011-05-19  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Tango3 ENET: Reduce memcpy used in packet transmission for performance improvement.
+
+2011-05-22  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Synchronized access between NAND block driver and MTD driver.
+
+2011-05-24  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] 8672 has the same UART0 as 8656, mbus sematics the same as 8910.
+
+2011-05-26  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] 8672 USB controller #1 uses different interrupt number.
+	* [YH] Dropping support for 867x OTP chips as the mechanism is similar to TANGO4.
+
+2011-05-31  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Back ported support for 867x OTP chips.
+
+2011-06-03  YH Lin <YH_Lin@sdesigns.com> Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [YH] SDIO: enable ADMA mode for 8672/89xx.
+	* [Craig] Atheros gigabit PHY (8035) support.
+
+2011-06-09  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] enable HIGHMEM for 24k/1004k based chips.
+
+2011-06-15 Craig Qu <Craig_Qu@sdesigns.com>
+
+	* [Craig]: Tango3 ENET: BH should be disabled during link-check.
+
+2011-06-16  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Tango3 ENET: fix MDC calculation not to exceed given frequency.
+
+2011-06-28  YH Lin <YH_Lin@sdesigns.com>
+
+	* [YH] Tango3: signature generation for vmlinux.gz based on dummy key from CPU_key package.
+

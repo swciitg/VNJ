@@ -1,0 +1,34 @@
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.29.ref/Makefile linux-2.6.29/Makefile
+--- linux-2.6.29.ref/Makefile	2009-08-03 10:51:04.000000000 -0700
++++ linux-2.6.29/Makefile	2009-08-03 10:58:43.000000000 -0700
+@@ -314,7 +314,7 @@
+ 
+ AS		= $(CROSS_COMPILE)as
+ LD		= $(CROSS_COMPILE)ld
+-CC		= $(CROSS_COMPILE)gcc
++CC		= ccache $(CROSS_COMPILE)gcc
+ CPP		= $(CC) -E
+ AR		= $(CROSS_COMPILE)ar
+ NM		= $(CROSS_COMPILE)nm
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.29.ref/README.1025.ccache.patch linux-2.6.29/README.1025.ccache.patch
+--- linux-2.6.29.ref/README.1025.ccache.patch	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/README.1025.ccache.patch	2009-08-03 10:59:49.000000000 -0700
+@@ -0,0 +1,18 @@
++Feature:
++--------
++Enable usage on ccache
++
++Prerequisite patch numbers:
++---------------------------
++none
++
++Primary author:
++---------------
++Emmanuel Michon
++
++Related to which chip version SMP86xx xx=?
++-----------------------------------------
++all
++
++(linux patches) which CONFIG_... are provided:
++----------------------------------------------

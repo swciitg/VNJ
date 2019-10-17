@@ -1,0 +1,94 @@
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/include/asm/compiler.h linux-2.6.29/arch/mips/include/asm/compiler.h
+--- linux-2.6.29.ref/arch/mips/include/asm/compiler.h	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/arch/mips/include/asm/compiler.h	2009-10-28 11:52:17.000000000 -0700
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) 2004, 2007  Maciej W. Rozycki
++ * Copyright (C) 2009  Wu Zhangjin, wuzj@lemote.com
+  *
+  * This file is subject to the terms and conditions of the GNU General Public
+  * License.  See the file "COPYING" in the main directory of this archive
+@@ -16,4 +17,13 @@
+ #define GCC_REG_ACCUM "accum"
+ #endif
+ 
++#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
++#define GCC_NO_H_CONSTRAINT
++#ifdef CONFIG_64BIT
++typedef unsigned int uintx_t __attribute__((mode(TI)));
++#else
++typedef u64 uintx_t;
++#endif
++#endif
++
+ #endif /* _ASM_COMPILER_H */
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/arch/mips/include/asm/div64.h linux-2.6.29/arch/mips/include/asm/div64.h
+--- linux-2.6.29.ref/arch/mips/include/asm/div64.h	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/arch/mips/include/asm/div64.h	2009-10-28 11:52:17.000000000 -0700
+@@ -1,6 +1,7 @@
+ /*
+  * Copyright (C) 2000, 2004  Maciej W. Rozycki
+  * Copyright (C) 2003, 07 Ralf Baechle (ralf@linux-mips.org)
++ * Copyright (C) 2009 Wu Zhangjin (wuzj@lemote.com)
+  *
+  * This file is subject to the terms and conditions of the GNU General Public
+  * License.  See the file "COPYING" in the main directory of this archive
+@@ -56,6 +57,24 @@
+ 	(res) = __quot32; \
+ 	__mod32; })
+ 
++/*
++ * __do_divu -- unsigned interger dividing
++ *
++ * handle removal of 'h' constraint in GCC 4.4
++ */
++#ifndef GCC_NO_H_CONSTRAINT    /* gcc <= 4.3*/
++#define __do_divu() ({ \
++       __asm__("divu   $0, %z2, %z3" \
++               : "=h" (__upper), "=l" (__high) \
++               : "Jr" (__high), "Jr" (__base) \
++               : GCC_REG_ACCUM); })
++
++#else          /* gcc >= 4.4 */
++#define __do_divu() ({ \
++       __upper = (uintx_t)__high % __base; \
++       __high = (uintx_t)__high / __base; })
++#endif
++
+ #define do_div(n, base) ({ \
+ 	unsigned long long __quot; \
+ 	unsigned long __mod; \
+@@ -70,10 +89,7 @@
+ 	__upper = __high; \
+ 	\
+ 	if (__high) \
+-		__asm__("divu	$0, %z2, %z3" \
+-			: "=h" (__upper), "=l" (__high) \
+-			: "Jr" (__high), "Jr" (__base) \
+-			: GCC_REG_ACCUM); \
++		__do_divu(); \
+ 	\
+ 	__mod = do_div64_32(__low, __upper, __low, __base); \
+ 	\
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/README.1029.gcc44x.patch linux-2.6.29/README.1029.gcc44x.patch
+--- linux-2.6.29.ref/README.1029.gcc44x.patch	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/README.1029.gcc44x.patch	2009-10-28 11:52:59.000000000 -0700
+@@ -0,0 +1,18 @@
++Feature:
++--------
++Support gcc 4.4.x
++
++Prerequisite patch numbers:
++---------------------------
++none
++
++Primary author:
++---------------
++YH Lin
++
++Related to which chip version SMP86xx xx=?
++-----------------------------------------
++all
++
++(linux patches) which CONFIG_... are provided:
++----------------------------------------------
