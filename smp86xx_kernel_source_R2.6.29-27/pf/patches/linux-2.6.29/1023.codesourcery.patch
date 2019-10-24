@@ -1,0 +1,48 @@
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.29.ref/arch/mips/Makefile linux-2.6.29/arch/mips/Makefile
+--- linux-2.6.29.ref/arch/mips/Makefile	2009-08-03 10:20:47.000000000 -0700
++++ linux-2.6.29/arch/mips/Makefile	2009-08-03 10:25:44.000000000 -0700
+@@ -80,7 +80,7 @@
+ # crossformat linking we rely on the elf2ecoff tool for format conversion.
+ #
+ cflags-y			+= -G 0 -mno-abicalls -fno-pic -pipe
+-cflags-y			+= -msoft-float
++#cflags-y			+= -msoft-float
+ LDFLAGS_vmlinux			+= -G 0 -static -n -nostdlib
+ MODFLAGS			+= -mlong-calls
+ 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.29.ref/Makefile linux-2.6.29/Makefile
+--- linux-2.6.29.ref/Makefile	2009-08-03 10:20:47.000000000 -0700
++++ linux-2.6.29/Makefile	2009-08-03 10:46:33.000000000 -0700
+@@ -194,7 +194,7 @@
+ 
+ export KBUILD_BUILDHOST := $(SUBARCH)
+ ARCH		?= mips
+-CROSS_COMPILE	?= mipsel-linux-
++CROSS_COMPILE	?= mips-linux-gnu-
+ 
+ # Architecture as present in compile.h
+ UTS_MACHINE 	:= $(ARCH)
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin --exclude=yamon-02.06-SIGMADESIGNS-01_el.bin linux-2.6.29.ref/README.1023.codesourcery.patch linux-2.6.29/README.1023.codesourcery.patch
+--- linux-2.6.29.ref/README.1023.codesourcery.patch	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/README.1023.codesourcery.patch	2009-08-03 10:48:02.000000000 -0700
+@@ -0,0 +1,20 @@
++Feature:
++--------
++Supporting CodeSourcery's toolchain
++
++Prerequisite patch numbers:
++---------------------------
++0000
++1000
++1001
++
++Primary author:
++---------------
++YH Lin
++
++Related to which chip version SMP86xx xx=?
++-----------------------------------------
++all
++
++(linux patches) which CONFIG_... are provided:
++----------------------------------------------

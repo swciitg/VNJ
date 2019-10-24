@@ -1,0 +1,5125 @@
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/card/block.c linux-2.6.29/drivers/mmc/card/block.c
+--- linux-2.6.29.ref/drivers/mmc/card/block.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/card/block.c	2011-05-31 10:42:56.553953312 -0700
+@@ -41,6 +41,8 @@
+ 
+ #include "queue.h"
+ 
++MODULE_ALIAS("mmc:block");
++
+ /*
+  * max 8 partitions per card
+  */
+@@ -252,6 +254,14 @@
+ 		brq.data.blocks = req->nr_sectors;
+ 
+ 		/*
++		 * The block layer doesn't support all sector count
++		 * restrictions, so we need to be prepared for too big
++		 * requests.
++		 */
++		if (brq.data.blocks > card->host->max_blk_count)
++			brq.data.blocks = card->host->max_blk_count;
++
++		/*
+ 		 * After a read error, we redo the request one sector at a time
+ 		 * in order to accurately determine which sectors can be read
+ 		 * successfully.
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/card/sdio_uart.c linux-2.6.29/drivers/mmc/card/sdio_uart.c
+--- linux-2.6.29.ref/drivers/mmc/card/sdio_uart.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/card/sdio_uart.c	2011-05-31 10:42:56.553953312 -0700
+@@ -30,6 +30,7 @@
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/mutex.h>
++#include <linux/seq_file.h>
+ #include <linux/serial_reg.h>
+ #include <linux/circ_buf.h>
+ #include <linux/gfp.h>
+@@ -933,67 +934,64 @@
+ 	return result;
+ }
+ 
+-static int sdio_uart_read_proc(char *page, char **start, off_t off,
+-			       int count, int *eof, void *data)
++static int sdio_uart_proc_show(struct seq_file *m, void *v)
+ {
+-	int i, len = 0;
+-	off_t begin = 0;
++	int i;
+ 
+-	len += sprintf(page, "serinfo:1.0 driver%s%s revision:%s\n",
++	seq_printf(m, "serinfo:1.0 driver%s%s revision:%s\n",
+ 		       "", "", "");
+-	for (i = 0; i < UART_NR && len < PAGE_SIZE - 96; i++) {
++	for (i = 0; i < UART_NR; i++) {
+ 		struct sdio_uart_port *port = sdio_uart_port_get(i);
+ 		if (port) {
+-			len += sprintf(page+len, "%d: uart:SDIO", i);
++			seq_printf(m, "%d: uart:SDIO", i);
+ 			if(capable(CAP_SYS_ADMIN)) {
+-				len += sprintf(page + len, " tx:%d rx:%d",
++				seq_printf(m, " tx:%d rx:%d",
+ 					       port->icount.tx, port->icount.rx);
+ 				if (port->icount.frame)
+-					len += sprintf(page + len, " fe:%d",
++					seq_printf(m, " fe:%d",
+ 						       port->icount.frame);
+ 				if (port->icount.parity)
+-					len += sprintf(page + len, " pe:%d",
++					seq_printf(m, " pe:%d",
+ 						       port->icount.parity);
+ 				if (port->icount.brk)
+-					len += sprintf(page + len, " brk:%d",
++					seq_printf(m, " brk:%d",
+ 						       port->icount.brk);
+ 				if (port->icount.overrun)
+-					len += sprintf(page + len, " oe:%d",
++					seq_printf(m, " oe:%d",
+ 						       port->icount.overrun);
+ 				if (port->icount.cts)
+-					len += sprintf(page + len, " cts:%d",
++					seq_printf(m, " cts:%d",
+ 						       port->icount.cts);
+ 				if (port->icount.dsr)
+-					len += sprintf(page + len, " dsr:%d",
++					seq_printf(m, " dsr:%d",
+ 						       port->icount.dsr);
+ 				if (port->icount.rng)
+-					len += sprintf(page + len, " rng:%d",
++					seq_printf(m, " rng:%d",
+ 						       port->icount.rng);
+ 				if (port->icount.dcd)
+-					len += sprintf(page + len, " dcd:%d",
++					seq_printf(m, " dcd:%d",
+ 						       port->icount.dcd);
+ 			}
+-			strcat(page, "\n");
+-			len++;
+ 			sdio_uart_port_put(port);
+-		}
+-
+-		if (len + begin > off + count)
+-			goto done;
+-		if (len + begin < off) {
+-			begin += len;
+-			len = 0;
++			seq_putc(m, '\n');
+ 		}
+ 	}
+-	*eof = 1;
++	return 0;
++}
+ 
+-done:
+-	if (off >= len + begin)
+-		return 0;
+-	*start = page + (off - begin);
+-	return (count < begin + len - off) ? count : (begin + len - off);
++static int sdio_uart_proc_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, sdio_uart_proc_show, NULL);
+ }
+ 
++static const struct file_operations sdio_uart_proc_fops = {
++	.owner		= THIS_MODULE,
++	.open		= sdio_uart_proc_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
+ static const struct tty_operations sdio_uart_ops = {
+ 	.open			= sdio_uart_open,
+ 	.close			= sdio_uart_close,
+@@ -1007,7 +1005,7 @@
+ 	.break_ctl		= sdio_uart_break_ctl,
+ 	.tiocmget		= sdio_uart_tiocmget,
+ 	.tiocmset		= sdio_uart_tiocmset,
+-	.read_proc		= sdio_uart_read_proc,
++	.proc_fops		= &sdio_uart_proc_fops,
+ };
+ 
+ static struct tty_driver *sdio_uart_tty_driver;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/core/bus.c linux-2.6.29/drivers/mmc/core/bus.c
+--- linux-2.6.29.ref/drivers/mmc/core/bus.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/core/bus.c	2011-05-31 10:42:56.553953312 -0700
+@@ -84,6 +84,14 @@
+ 	}
+ 
+ 	retval = add_uevent_var(env, "MMC_NAME=%s", mmc_card_name(card));
++	if (retval)
++		return retval;
++
++	/*
++	 * Request the mmc_block device.  Note: that this is a direct request
++	 * for the module it carries no information as to what is inserted.
++	 */
++	retval = add_uevent_var(env, "MODALIAS=mmc:block");
+ 
+ 	return retval;
+ }
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/core/core.c linux-2.6.29/drivers/mmc/core/core.c
+--- linux-2.6.29.ref/drivers/mmc/core/core.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/core/core.c	2011-05-31 10:42:56.553953312 -0700
+@@ -21,6 +21,7 @@
+ #include <linux/leds.h>
+ #include <linux/scatterlist.h>
+ #include <linux/log2.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include <linux/mmc/card.h>
+ #include <linux/mmc/host.h>
+@@ -297,6 +298,21 @@
+ 			data->timeout_clks = 0;
+ 		}
+ 	}
++	/*
++	 * Some cards need very high timeouts if driven in SPI mode.
++	 * The worst observed timeout was 900ms after writing a
++	 * continuous stream of data until the internal logic
++	 * overflowed.
++	 */
++	if (mmc_host_is_spi(card->host)) {
++		if (data->flags & MMC_DATA_WRITE) {
++			if (data->timeout_ns < 1000000000)
++				data->timeout_ns = 1000000000;	/* 1s */
++		} else {
++			if (data->timeout_ns < 100000000)
++				data->timeout_ns =  100000000;	/* 100ms */
++		}
++	}
+ }
+ EXPORT_SYMBOL(mmc_set_data_timeout);
+ 
+@@ -523,6 +539,105 @@
+ }
+ EXPORT_SYMBOL(mmc_vddrange_to_ocrmask);
+ 
++#ifdef CONFIG_REGULATOR
++
++/**
++ * mmc_regulator_get_ocrmask - return mask of supported voltages
++ * @supply: regulator to use
++ *
++ * This returns either a negative errno, or a mask of voltages that
++ * can be provided to MMC/SD/SDIO devices using the specified voltage
++ * regulator.  This would normally be called before registering the
++ * MMC host adapter.
++ */
++int mmc_regulator_get_ocrmask(struct regulator *supply)
++{
++	int			result = 0;
++	int			count;
++	int			i;
++
++	count = regulator_count_voltages(supply);
++	if (count < 0)
++		return count;
++
++	for (i = 0; i < count; i++) {
++		int		vdd_uV;
++		int		vdd_mV;
++
++		vdd_uV = regulator_list_voltage(supply, i);
++		if (vdd_uV <= 0)
++			continue;
++
++		vdd_mV = vdd_uV / 1000;
++		result |= mmc_vddrange_to_ocrmask(vdd_mV, vdd_mV);
++	}
++
++	return result;
++}
++EXPORT_SYMBOL(mmc_regulator_get_ocrmask);
++
++/**
++ * mmc_regulator_set_ocr - set regulator to match host->ios voltage
++ * @vdd_bit: zero for power off, else a bit number (host->ios.vdd)
++ * @supply: regulator to use
++ *
++ * Returns zero on success, else negative errno.
++ *
++ * MMC host drivers may use this to enable or disable a regulator using
++ * a particular supply voltage.  This would normally be called from the
++ * set_ios() method.
++ */
++int mmc_regulator_set_ocr(struct regulator *supply, unsigned short vdd_bit)
++{
++	int			result = 0;
++	int			min_uV, max_uV;
++	int			enabled;
++
++	enabled = regulator_is_enabled(supply);
++	if (enabled < 0)
++		return enabled;
++
++	if (vdd_bit) {
++		int		tmp;
++		int		voltage;
++
++		/* REVISIT mmc_vddrange_to_ocrmask() may have set some
++		 * bits this regulator doesn't quite support ... don't
++		 * be too picky, most cards and regulators are OK with
++		 * a 0.1V range goof (it's a small error percentage).
++		 */
++		tmp = vdd_bit - ilog2(MMC_VDD_165_195);
++		if (tmp == 0) {
++			min_uV = 1650 * 1000;
++			max_uV = 1950 * 1000;
++		} else {
++			min_uV = 1900 * 1000 + tmp * 100 * 1000;
++			max_uV = min_uV + 100 * 1000;
++		}
++
++		/* avoid needless changes to this voltage; the regulator
++		 * might not allow this operation
++		 */
++		voltage = regulator_get_voltage(supply);
++		if (voltage < 0)
++			result = voltage;
++		else if (voltage < min_uV || voltage > max_uV)
++			result = regulator_set_voltage(supply, min_uV, max_uV);
++		else
++			result = 0;
++
++		if (result == 0 && !enabled)
++			result = regulator_enable(supply);
++	} else if (enabled) {
++		result = regulator_disable(supply);
++	}
++
++	return result;
++}
++EXPORT_SYMBOL(mmc_regulator_set_ocr);
++
++#endif
++
+ /*
+  * Mask off any voltages we don't support and select
+  * the lowest voltage
+@@ -591,7 +706,7 @@
+ 	 * This delay should be sufficient to allow the power supply
+ 	 * to reach the minimum voltage.
+ 	 */
+-	mmc_delay(2);
++	mmc_delay(10);
+ 
+ 	host->ios.clock = host->f_min;
+ 	host->ios.power_mode = MMC_POWER_ON;
+@@ -601,7 +716,7 @@
+ 	 * This delay must be at least 74 clock sizes, or 1 ms, or the
+ 	 * time required to reach a stable voltage.
+ 	 */
+-	mmc_delay(2);
++	mmc_delay(10);
+ }
+ 
+ static void mmc_power_off(struct mmc_host *host)
+@@ -815,6 +930,7 @@
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ #endif
+ 
++	cancel_delayed_work(&host->detect);
+ 	mmc_flush_scheduled_work();
+ 
+ 	mmc_bus_get(host);
+@@ -842,6 +958,7 @@
+  */
+ int mmc_suspend_host(struct mmc_host *host, pm_message_t state)
+ {
++	cancel_delayed_work(&host->detect);
+ 	mmc_flush_scheduled_work();
+ 
+ 	mmc_bus_get(host);
+@@ -875,6 +992,7 @@
+ 	mmc_bus_get(host);
+ 	if (host->bus_ops && !host->bus_dead) {
+ 		mmc_power_up(host);
++		mmc_select_voltage(host, host->ocr);
+ 		BUG_ON(!host->bus_ops->resume);
+ 		host->bus_ops->resume(host);
+ 	}
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/core/debugfs.c linux-2.6.29/drivers/mmc/core/debugfs.c
+--- linux-2.6.29.ref/drivers/mmc/core/debugfs.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/core/debugfs.c	2011-05-31 10:42:56.553953312 -0700
+@@ -184,6 +184,68 @@
+ DEFINE_SIMPLE_ATTRIBUTE(mmc_dbg_card_status_fops, mmc_dbg_card_status_get,
+ 		NULL, "%08llx\n");
+ 
++#define EXT_CSD_STR_LEN 1025
++
++static int mmc_ext_csd_open(struct inode *inode, struct file *filp)
++{
++	struct mmc_card *card = inode->i_private;
++	char *buf;
++	ssize_t n = 0;
++	u8 *ext_csd;
++	int err, i;
++
++	buf = kmalloc(EXT_CSD_STR_LEN + 1, GFP_KERNEL);
++	if (!buf)
++		return -ENOMEM;
++
++	ext_csd = kmalloc(512, GFP_KERNEL);
++	if (!ext_csd) {
++		err = -ENOMEM;
++		goto out_free;
++	}
++
++	mmc_claim_host(card->host);
++	err = mmc_send_ext_csd(card, ext_csd);
++	mmc_release_host(card->host);
++	if (err)
++		goto out_free;
++
++	for (i = 511; i >= 0; i--)
++		n += sprintf(buf + n, "%02x", ext_csd[i]);
++	n += sprintf(buf + n, "\n");
++	BUG_ON(n != EXT_CSD_STR_LEN);
++
++	filp->private_data = buf;
++	kfree(ext_csd);
++	return 0;
++
++out_free:
++	kfree(buf);
++	kfree(ext_csd);
++	return err;
++}
++
++static ssize_t mmc_ext_csd_read(struct file *filp, char __user *ubuf,
++				size_t cnt, loff_t *ppos)
++{
++	char *buf = filp->private_data;
++
++	return simple_read_from_buffer(ubuf, cnt, ppos,
++				       buf, EXT_CSD_STR_LEN);
++}
++
++static int mmc_ext_csd_release(struct inode *inode, struct file *file)
++{
++	kfree(file->private_data);
++	return 0;
++}
++
++static struct file_operations mmc_dbg_ext_csd_fops = {
++	.open		= mmc_ext_csd_open,
++	.read		= mmc_ext_csd_read,
++	.release	= mmc_ext_csd_release,
++};
++
+ void mmc_add_card_debugfs(struct mmc_card *card)
+ {
+ 	struct mmc_host	*host = card->host;
+@@ -211,6 +273,11 @@
+ 					&mmc_dbg_card_status_fops))
+ 			goto err;
+ 
++	if (mmc_card_mmc(card))
++		if (!debugfs_create_file("ext_csd", S_IRUSR, root, card,
++					&mmc_dbg_ext_csd_fops))
++			goto err;
++
+ 	return;
+ 
+ err:
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/core/mmc.c linux-2.6.29/drivers/mmc/core/mmc.c
+--- linux-2.6.29.ref/drivers/mmc/core/mmc.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/core/mmc.c	2011-05-31 10:42:56.553953312 -0700
+@@ -208,7 +208,7 @@
+ 	}
+ 
+ 	ext_csd_struct = ext_csd[EXT_CSD_REV];
+-	if (ext_csd_struct > 2) {
++	if (ext_csd_struct > 3) {
+ 		printk(KERN_ERR "%s: unrecognised EXT_CSD structure "
+ 			"version %d\n", mmc_hostname(card->host),
+ 			ext_csd_struct);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/core/sd.c linux-2.6.29/drivers/mmc/core/sd.c
+--- linux-2.6.29.ref/drivers/mmc/core/sd.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/core/sd.c	2011-05-31 10:42:56.593955579 -0700
+@@ -21,7 +21,7 @@
+ #include "bus.h"
+ #include "mmc_ops.h"
+ #include "sd_ops.h"
+-
++#include "../host/sdhci.h"
+ static const unsigned int tran_exp[] = {
+ 	10000,		100000,		1000000,	10000000,
+ 	0,		0,		0,		0
+@@ -336,6 +336,7 @@
+ 	int err;
+ 	u32 cid[4];
+ 	unsigned int max_dtr;
++	struct sdhci_host *sd_host = mmc_priv(host);
+ 
+ 	BUG_ON(!host);
+ 	WARN_ON(!host->claimed);
+@@ -363,15 +364,6 @@
+ 		goto err;
+ 
+ 	/*
+-	 * For SPI, enable CRC as appropriate.
+-	 */
+-	if (mmc_host_is_spi(host)) {
+-		err = mmc_spi_set_crc(host, use_spi_crc);
+-		if (err)
+-			goto err;
+-	}
+-
+-	/*
+ 	 * Fetch CID from card.
+ 	 */
+ 	if (mmc_host_is_spi(host))
+@@ -458,6 +450,18 @@
+ 	}
+ 
+ 	/*
++	 * For SPI, enable CRC as appropriate.
++	 * This CRC enable is located AFTER the reading of the
++	 * card registers because some SDHC cards are not able
++	 * to provide valid CRCs for non-512-byte blocks.
++	 */
++	if (mmc_host_is_spi(host)) {
++		err = mmc_spi_set_crc(host, use_spi_crc);
++		if (err)
++			goto free_card;
++	}
++
++	/*
+ 	 * Attempt to change to high-speed (if supported)
+ 	 */
+ 	err = mmc_switch_hs(card);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/core/sdio_cis.c linux-2.6.29/drivers/mmc/core/sdio_cis.c
+--- linux-2.6.29.ref/drivers/mmc/core/sdio_cis.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/core/sdio_cis.c	2011-05-31 10:42:56.593955579 -0700
+@@ -111,6 +111,10 @@
+ 	card->cis.max_dtr = speed_val[(buf[3] >> 3) & 15] *
+ 			    speed_unit[buf[3] & 7];
+ 
++	/* workaround the high speed issue */
++	if (!(card->host->caps & MMC_CAP_SD_HIGHSPEED))
++		card->cis.max_dtr /= 2 ;
++
+ 	return 0;
+ }
+ 
+@@ -223,10 +227,18 @@
+ 		if (tpl_code == 0xff)
+ 			break;
+ 
++		/* null entries have no link field or data */
++		if (tpl_code == 0x00)
++			continue;
++
+ 		ret = mmc_io_rw_direct(card, 0, 0, ptr++, 0, &tpl_link);
+ 		if (ret)
+ 			break;
+ 
++		/* a size of 0xff also means we're done */
++		if (tpl_link == 0xff)
++			break;
++
+ 		this = kmalloc(sizeof(*this) + tpl_link, GFP_KERNEL);
+ 		if (!this)
+ 			return -ENOMEM;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/core/sdio_ops.c linux-2.6.29/drivers/mmc/core/sdio_ops.c
+--- linux-2.6.29.ref/drivers/mmc/core/sdio_ops.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/core/sdio_ops.c	2011-05-31 10:42:56.593955579 -0700
+@@ -76,6 +76,10 @@
+ 	BUG_ON(!card);
+ 	BUG_ON(fn > 7);
+ 
++	/* sanity check */
++	if (addr & ~0x1FFFF)
++		return -EINVAL;
++
+ 	memset(&cmd, 0, sizeof(struct mmc_command));
+ 
+ 	cmd.opcode = SD_IO_RW_DIRECT;
+@@ -125,6 +129,10 @@
+ 	WARN_ON(blocks == 0);
+ 	WARN_ON(blksz == 0);
+ 
++	/* sanity check */
++	if (addr & ~0x1FFFF)
++		return -EINVAL;
++
+ 	memset(&mrq, 0, sizeof(struct mmc_request));
+ 	memset(&cmd, 0, sizeof(struct mmc_command));
+ 	memset(&data, 0, sizeof(struct mmc_data));
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/atmel-mci.c linux-2.6.29/drivers/mmc/host/atmel-mci.c
+--- linux-2.6.29.ref/drivers/mmc/host/atmel-mci.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/atmel-mci.c	2011-05-31 10:42:56.593955579 -0700
+@@ -812,7 +812,7 @@
+ 		slot->sdc_reg |= MCI_SDCBUS_1BIT;
+ 		break;
+ 	case MMC_BUS_WIDTH_4:
+-		slot->sdc_reg = MCI_SDCBUS_4BIT;
++		slot->sdc_reg |= MCI_SDCBUS_4BIT;
+ 		break;
+ 	}
+ 
+@@ -1603,7 +1603,7 @@
+ 
+ 	tasklet_init(&host->tasklet, atmci_tasklet_func, (unsigned long)host);
+ 
+-	ret = request_irq(irq, atmci_interrupt, 0, pdev->dev.bus_id, host);
++	ret = request_irq(irq, atmci_interrupt, 0, dev_name(&pdev->dev), host);
+ 	if (ret)
+ 		goto err_request_irq;
+ 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/imxmmc.c linux-2.6.29/drivers/mmc/host/imxmmc.c
+--- linux-2.6.29.ref/drivers/mmc/host/imxmmc.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/imxmmc.c	2011-05-31 10:42:56.593955579 -0700
+@@ -307,13 +307,6 @@
+ 
+ 	wmb();
+ 
+-	if (host->actual_bus_width == MMC_BUS_WIDTH_4)
+-		BLR(host->dma) = 0;	/* burst 64 byte read / 64 bytes write */
+-	else
+-		BLR(host->dma) = 16;	/* burst 16 byte read / 16 bytes write */
+-
+-	RSSR(host->dma) = DMA_REQ_SDHC;
+-
+ 	set_bit(IMXMCI_PEND_DMA_DATA_b, &host->pending_events);
+ 	clear_bit(IMXMCI_PEND_CPU_DATA_b, &host->pending_events);
+ 
+@@ -818,9 +811,11 @@
+ 	if (ios->bus_width == MMC_BUS_WIDTH_4) {
+ 		host->actual_bus_width = MMC_BUS_WIDTH_4;
+ 		imx_gpio_mode(PB11_PF_SD_DAT3);
++		BLR(host->dma) = 0;	/* burst 64 byte read/write */
+ 	} else {
+ 		host->actual_bus_width = MMC_BUS_WIDTH_1;
+ 		imx_gpio_mode(GPIO_PORTB | GPIO_IN | GPIO_PUEN | 11);
++		BLR(host->dma) = 16;	/* burst 16 byte read/write */
+ 	}
+ 
+ 	if (host->power_mode != ios->power_mode) {
+@@ -938,7 +933,7 @@
+ 	mod_timer(&host->timer, jiffies + (HZ>>1));
+ }
+ 
+-static int imxmci_probe(struct platform_device *pdev)
++static int __init imxmci_probe(struct platform_device *pdev)
+ {
+ 	struct mmc_host *mmc;
+ 	struct imxmci_host *host = NULL;
+@@ -1034,6 +1029,7 @@
+ 	}
+ 	host->dma_allocated = 1;
+ 	imx_dma_setup_handlers(host->dma, imxmci_dma_irq, NULL, host);
++	RSSR(host->dma) = DMA_REQ_SDHC;
+ 
+ 	tasklet_init(&host->tasklet, imxmci_tasklet_fnc, (unsigned long)host);
+ 	host->status_reg=0;
+@@ -1079,7 +1075,7 @@
+ 	return ret;
+ }
+ 
+-static int imxmci_remove(struct platform_device *pdev)
++static int __exit imxmci_remove(struct platform_device *pdev)
+ {
+ 	struct mmc_host *mmc = platform_get_drvdata(pdev);
+ 
+@@ -1145,8 +1141,7 @@
+ #endif /* CONFIG_PM */
+ 
+ static struct platform_driver imxmci_driver = {
+-	.probe		= imxmci_probe,
+-	.remove		= imxmci_remove,
++	.remove		= __exit_p(imxmci_remove),
+ 	.suspend	= imxmci_suspend,
+ 	.resume		= imxmci_resume,
+ 	.driver		= {
+@@ -1157,7 +1152,7 @@
+ 
+ static int __init imxmci_init(void)
+ {
+-	return platform_driver_register(&imxmci_driver);
++	return platform_driver_probe(&imxmci_driver, imxmci_probe);
+ }
+ 
+ static void __exit imxmci_exit(void)
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/Kconfig linux-2.6.29/drivers/mmc/host/Kconfig
+--- linux-2.6.29.ref/drivers/mmc/host/Kconfig	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/Kconfig	2011-05-31 10:42:56.593955579 -0700
+@@ -37,6 +37,21 @@
+ 
+ 	  If unsure, say N.
+ 
++config MMC_SDHCI_IO_ACCESSORS
++	bool
++	depends on MMC_SDHCI
++	help
++	  This is silent Kconfig symbol that is selected by the drivers that
++	  need to overwrite SDHCI IO memory accessors.
++
++config MMC_SDHCI_TANGOX
++	tristate "Sigma Designs SDIO Interface support"
++	depends on MMC_SDHCI && TANGO3
++	help
++	  This select the SDIO support for Sigma Designs' built-in
++          interface(s), which is available for SMP864x/SMP865x/SMP867x
++	   chips.
++
+ config MMC_SDHCI_PCI
+ 	tristate "SDHCI support on PCI bus"
+ 	depends on MMC_SDHCI && PCI
+@@ -65,6 +80,17 @@
+ 
+ 	  If unsure, say Y.
+ 
++config MMC_SDHCI_OF
++	tristate "SDHCI support on OpenFirmware platforms"
++	depends on MMC_SDHCI && PPC_OF
++	select MMC_SDHCI_IO_ACCESSORS
++	help
++	  This selects the OF support for Secure Digital Host Controller
++	  Interfaces. So far, only the Freescale eSDHC controller is known
++	  to exist on OF platforms.
++
++	  If unsure, say N.
++
+ config MMC_OMAP
+ 	tristate "TI OMAP Multimedia Card Interface support"
+ 	depends on ARCH_OMAP
+@@ -171,13 +197,24 @@
+           To compile this driver as a module, choose M here: the
+ 	  module will be called tifm_sd.
+ 
++config MMC_MVSDIO
++	tristate "Marvell MMC/SD/SDIO host driver"
++	depends on PLAT_ORION
++	---help---
++	  This selects the Marvell SDIO host driver.
++	  SDIO may currently be found on the Kirkwood 88F6281 and 88F6192
++	  SoC controllers.
++
++	  To compile this driver as a module, choose M here: the
++	  module will be called mvsdio.
++
+ config MMC_SPI
+ 	tristate "MMC/SD/SDIO over SPI"
+ 	depends on SPI_MASTER && !HIGHMEM && HAS_DMA
+ 	select CRC7
+ 	select CRC_ITU_T
+ 	help
+-	  Some systems accss MMC/SD/SDIO cards using a SPI controller
++	  Some systems access MMC/SD/SDIO cards using a SPI controller
+ 	  instead of using a "native" MMC/SD/SDIO controller.  This has a
+ 	  disadvantage of being relatively high overhead, but a compensating
+ 	  advantage of working on many systems without dedicated MMC/SD/SDIO
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/Makefile linux-2.6.29/drivers/mmc/host/Makefile
+--- linux-2.6.29.ref/drivers/mmc/host/Makefile	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/Makefile	2011-05-31 10:42:56.593955579 -0700
+@@ -13,6 +13,7 @@
+ obj-$(CONFIG_MMC_SDHCI)		+= sdhci.o
+ obj-$(CONFIG_MMC_SDHCI_PCI)	+= sdhci-pci.o
+ obj-$(CONFIG_MMC_RICOH_MMC)	+= ricoh_mmc.o
++obj-$(CONFIG_MMC_SDHCI_OF)	+= sdhci-of.o
+ obj-$(CONFIG_MMC_WBSD)		+= wbsd.o
+ obj-$(CONFIG_MMC_AU1X)		+= au1xmmc.o
+ obj-$(CONFIG_MMC_OMAP)		+= omap.o
+@@ -20,6 +21,7 @@
+ obj-$(CONFIG_MMC_AT91)		+= at91_mci.o
+ obj-$(CONFIG_MMC_ATMELMCI)	+= atmel-mci.o
+ obj-$(CONFIG_MMC_TIFM_SD)	+= tifm_sd.o
++obj-$(CONFIG_MMC_MVSDIO)	+= mvsdio.o
+ obj-$(CONFIG_MMC_SPI)		+= mmc_spi.o
+ ifeq ($(CONFIG_OF),y)
+ obj-$(CONFIG_MMC_SPI)		+= of_mmc_spi.o
+@@ -28,3 +30,5 @@
+ obj-$(CONFIG_MMC_SDRICOH_CS)	+= sdricoh_cs.o
+ obj-$(CONFIG_MMC_TMIO)		+= tmio_mmc.o
+ 
++obj-$(CONFIG_MMC_SDHCI_TANGOX)	+= sdhci-tangox.o
++
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/mmci.c linux-2.6.29/drivers/mmc/host/mmci.c
+--- linux-2.6.29.ref/drivers/mmc/host/mmci.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/mmci.c	2011-05-31 10:42:56.593955579 -0700
+@@ -490,7 +490,7 @@
+ 	mod_timer(&host->timer, jiffies + HZ);
+ }
+ 
+-static int mmci_probe(struct amba_device *dev, void *id)
++static int __devinit mmci_probe(struct amba_device *dev, struct amba_id *id)
+ {
+ 	struct mmc_platform_data *plat = dev->dev.platform_data;
+ 	struct mmci_host *host;
+@@ -514,6 +514,7 @@
+ 	}
+ 
+ 	host = mmc_priv(mmc);
++	host->mmc = mmc;
+ 	/* Bits 12 thru 19 is the designer */
+ 	host->hw_designer = (dev->periphid >> 12) & 0xff;
+ 	/* Bits 20 thru 23 is the revison */
+@@ -545,7 +546,6 @@
+ 		host->mclk = clk_get_rate(host->clk);
+ 		DBG(host, "eventual mclk rate: %u Hz\n", host->mclk);
+ 	}
+-	host->mmc = mmc;
+ 	host->base = ioremap(dev->res.start, SZ_4K);
+ 	if (!host->base) {
+ 		ret = -ENOMEM;
+@@ -633,7 +633,7 @@
+ 	return ret;
+ }
+ 
+-static int mmci_remove(struct amba_device *dev)
++static int __devexit mmci_remove(struct amba_device *dev)
+ {
+ 	struct mmc_host *mmc = amba_get_drvdata(dev);
+ 
+@@ -730,7 +730,7 @@
+ 		.name	= DRIVER_NAME,
+ 	},
+ 	.probe		= mmci_probe,
+-	.remove		= mmci_remove,
++	.remove		= __devexit_p(mmci_remove),
+ 	.suspend	= mmci_suspend,
+ 	.resume		= mmci_resume,
+ 	.id_table	= mmci_ids,
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/mmc_spi.c linux-2.6.29/drivers/mmc/host/mmc_spi.c
+--- linux-2.6.29.ref/drivers/mmc/host/mmc_spi.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/mmc_spi.c	2011-05-31 10:42:56.593955579 -0700
+@@ -24,7 +24,7 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+  */
+-#include <linux/hrtimer.h>
++#include <linux/sched.h>
+ #include <linux/delay.h>
+ #include <linux/bio.h>
+ #include <linux/dma-mapping.h>
+@@ -95,7 +95,7 @@
+  * reads which takes nowhere near that long.  Older cards may be able to use
+  * shorter timeouts ... but why bother?
+  */
+-#define r1b_timeout		ktime_set(3, 0)
++#define r1b_timeout		(HZ * 3)
+ 
+ 
+ /****************************************************************************/
+@@ -183,12 +183,11 @@
+ 	return status;
+ }
+ 
+-static int
+-mmc_spi_skip(struct mmc_spi_host *host, ktime_t timeout, unsigned n, u8 byte)
++static int mmc_spi_skip(struct mmc_spi_host *host, unsigned long timeout,
++			unsigned n, u8 byte)
+ {
+ 	u8		*cp = host->data->status;
+-
+-	timeout = ktime_add(timeout, ktime_get());
++	unsigned long start = jiffies;
+ 
+ 	while (1) {
+ 		int		status;
+@@ -203,22 +202,26 @@
+ 				return cp[i];
+ 		}
+ 
+-		/* REVISIT investigate msleep() to avoid busy-wait I/O
+-		 * in at least some cases.
+-		 */
+-		if (ktime_to_ns(ktime_sub(ktime_get(), timeout)) > 0)
++		if (time_is_before_jiffies(start + timeout))
+ 			break;
++
++		/* If we need long timeouts, we may release the CPU.
++		 * We use jiffies here because we want to have a relation
++		 * between elapsed time and the blocking of the scheduler.
++		 */
++		if (time_is_before_jiffies(start+1))
++			schedule();
+ 	}
+ 	return -ETIMEDOUT;
+ }
+ 
+ static inline int
+-mmc_spi_wait_unbusy(struct mmc_spi_host *host, ktime_t timeout)
++mmc_spi_wait_unbusy(struct mmc_spi_host *host, unsigned long timeout)
+ {
+ 	return mmc_spi_skip(host, timeout, sizeof(host->data->status), 0);
+ }
+ 
+-static int mmc_spi_readtoken(struct mmc_spi_host *host, ktime_t timeout)
++static int mmc_spi_readtoken(struct mmc_spi_host *host, unsigned long timeout)
+ {
+ 	return mmc_spi_skip(host, timeout, 1, 0xff);
+ }
+@@ -251,6 +254,10 @@
+ 	u8	*cp = host->data->status;
+ 	u8	*end = cp + host->t.len;
+ 	int	value = 0;
++	int	bitshift;
++	u8 	leftover = 0;
++	unsigned short rotator;
++	int 	i;
+ 	char	tag[32];
+ 
+ 	snprintf(tag, sizeof(tag), "  ... CMD%d response SPI_%s",
+@@ -268,9 +275,8 @@
+ 
+ 	/* Data block reads (R1 response types) may need more data... */
+ 	if (cp == end) {
+-		unsigned	i;
+-
+ 		cp = host->data->status;
++		end = cp+1;
+ 
+ 		/* Card sends N(CR) (== 1..8) bytes of all-ones then one
+ 		 * status byte ... and we already scanned 2 bytes.
+@@ -279,8 +285,11 @@
+ 		 * so it can always DMA directly into the target buffer.
+ 		 * It'd probably be better to memcpy() the first chunk and
+ 		 * avoid extra i/o calls...
++		 *
++		 * Note we check for more than 8 bytes, because in practice,
++		 * some SD cards are slow...
+ 		 */
+-		for (i = 2; i < 9; i++) {
++		for (i = 2; i < 16; i++) {
+ 			value = mmc_spi_readbytes(host, 1);
+ 			if (value < 0)
+ 				goto done;
+@@ -292,20 +301,34 @@
+ 	}
+ 
+ checkstatus:
+-	if (*cp & 0x80) {
+-		dev_dbg(&host->spi->dev, "%s: INVALID RESPONSE, %02x\n",
+-					tag, *cp);
+-		value = -EBADR;
+-		goto done;
++	bitshift = 0;
++	if (*cp & 0x80)	{
++		/* Houston, we have an ugly card with a bit-shifted response */
++		rotator = *cp++ << 8;
++		/* read the next byte */
++		if (cp == end) {
++			value = mmc_spi_readbytes(host, 1);
++			if (value < 0)
++				goto done;
++			cp = host->data->status;
++			end = cp+1;
++		}
++		rotator |= *cp++;
++		while (rotator & 0x8000) {
++			bitshift++;
++			rotator <<= 1;
++		}
++		cmd->resp[0] = rotator >> 8;
++		leftover = rotator;
++	} else {
++		cmd->resp[0] = *cp++;
+ 	}
+-
+-	cmd->resp[0] = *cp++;
+ 	cmd->error = 0;
+ 
+ 	/* Status byte: the entire seven-bit R1 response.  */
+ 	if (cmd->resp[0] != 0) {
+ 		if ((R1_SPI_PARAMETER | R1_SPI_ADDRESS
+-					| R1_SPI_ILLEGAL_COMMAND)
++				      | R1_SPI_ILLEGAL_COMMAND)
+ 				& cmd->resp[0])
+ 			value = -EINVAL;
+ 		else if (R1_SPI_COM_CRC & cmd->resp[0])
+@@ -333,12 +356,45 @@
+ 	 * SPI R5 == R1 + data byte; IO_RW_DIRECT
+ 	 */
+ 	case MMC_RSP_SPI_R2:
+-		cmd->resp[0] |= *cp << 8;
++		/* read the next byte */
++		if (cp == end) {
++			value = mmc_spi_readbytes(host, 1);
++			if (value < 0)
++				goto done;
++			cp = host->data->status;
++			end = cp+1;
++		}
++		if (bitshift) {
++			rotator = leftover << 8;
++			rotator |= *cp << bitshift;
++			cmd->resp[0] |= (rotator & 0xFF00);
++		} else {
++			cmd->resp[0] |= *cp << 8;
++		}
+ 		break;
+ 
+ 	/* SPI R3, R4, or R7 == R1 + 4 bytes */
+ 	case MMC_RSP_SPI_R3:
+-		cmd->resp[1] = get_unaligned_be32(cp);
++		rotator = leftover << 8;
++		cmd->resp[1] = 0;
++		for (i = 0; i < 4; i++) {
++			cmd->resp[1] <<= 8;
++			/* read the next byte */
++			if (cp == end) {
++				value = mmc_spi_readbytes(host, 1);
++				if (value < 0)
++					goto done;
++				cp = host->data->status;
++				end = cp+1;
++			}
++			if (bitshift) {
++				rotator |= *cp++ << bitshift;
++				cmd->resp[1] |= (rotator >> 8);
++				rotator <<= 8;
++			} else {
++				cmd->resp[1] |= *cp++;
++			}
++		}
+ 		break;
+ 
+ 	/* SPI R1 == just one status byte */
+@@ -604,11 +660,12 @@
+  */
+ static int
+ mmc_spi_writeblock(struct mmc_spi_host *host, struct spi_transfer *t,
+-	ktime_t timeout)
++	unsigned long timeout)
+ {
+ 	struct spi_device	*spi = host->spi;
+ 	int			status, i;
+ 	struct scratch		*scratch = host->data;
++	u32			pattern;
+ 
+ 	if (host->mmc->use_spi_crc)
+ 		scratch->crc_val = cpu_to_be16(
+@@ -636,8 +693,27 @@
+ 	 * doesn't necessarily tell whether the write operation succeeded;
+ 	 * it just says if the transmission was ok and whether *earlier*
+ 	 * writes succeeded; see the standard.
+-	 */
+-	switch (SPI_MMC_RESPONSE_CODE(scratch->status[0])) {
++	 *
++	 * In practice, there are (even modern SDHC-)cards which are late
++	 * in sending the response, and miss the time frame by a few bits,
++	 * so we have to cope with this situation and check the response
++	 * bit-by-bit. Arggh!!!
++	 */
++	pattern  = scratch->status[0] << 24;
++	pattern |= scratch->status[1] << 16;
++	pattern |= scratch->status[2] << 8;
++	pattern |= scratch->status[3];
++
++	/* First 3 bit of pattern are undefined */
++	pattern |= 0xE0000000;
++
++	/* left-adjust to leading 0 bit */
++	while (pattern & 0x80000000)
++		pattern <<= 1;
++	/* right-adjust for pattern matching. Code is in bit 4..0 now. */
++	pattern >>= 27;
++
++	switch (pattern) {
+ 	case SPI_RESPONSE_ACCEPTED:
+ 		status = 0;
+ 		break;
+@@ -668,8 +744,9 @@
+ 	/* Return when not busy.  If we didn't collect that status yet,
+ 	 * we'll need some more I/O.
+ 	 */
+-	for (i = 1; i < sizeof(scratch->status); i++) {
+-		if (scratch->status[i] != 0)
++	for (i = 4; i < sizeof(scratch->status); i++) {
++		/* card is non-busy if the most recent bit is 1 */
++		if (scratch->status[i] & 0x01)
+ 			return 0;
+ 	}
+ 	return mmc_spi_wait_unbusy(host, timeout);
+@@ -693,11 +770,13 @@
+  */
+ static int
+ mmc_spi_readblock(struct mmc_spi_host *host, struct spi_transfer *t,
+-	ktime_t timeout)
++	unsigned long timeout)
+ {
+ 	struct spi_device	*spi = host->spi;
+ 	int			status;
+ 	struct scratch		*scratch = host->data;
++	unsigned int 		bitshift;
++	u8			leftover;
+ 
+ 	/* At least one SD card sends an all-zeroes byte when N(CX)
+ 	 * applies, before the all-ones bytes ... just cope with that.
+@@ -709,38 +788,60 @@
+ 	if (status == 0xff || status == 0)
+ 		status = mmc_spi_readtoken(host, timeout);
+ 
+-	if (status == SPI_TOKEN_SINGLE) {
+-		if (host->dma_dev) {
+-			dma_sync_single_for_device(host->dma_dev,
+-					host->data_dma, sizeof(*scratch),
+-					DMA_BIDIRECTIONAL);
+-			dma_sync_single_for_device(host->dma_dev,
+-					t->rx_dma, t->len,
+-					DMA_FROM_DEVICE);
+-		}
++	if (status < 0) {
++		dev_dbg(&spi->dev, "read error %02x (%d)\n", status, status);
++		return status;
++	}
+ 
+-		status = spi_sync(spi, &host->m);
++	/* The token may be bit-shifted...
++	 * the first 0-bit precedes the data stream.
++	 */
++	bitshift = 7;
++	while (status & 0x80) {
++		status <<= 1;
++		bitshift--;
++	}
++	leftover = status << 1;
+ 
+-		if (host->dma_dev) {
+-			dma_sync_single_for_cpu(host->dma_dev,
+-					host->data_dma, sizeof(*scratch),
+-					DMA_BIDIRECTIONAL);
+-			dma_sync_single_for_cpu(host->dma_dev,
+-					t->rx_dma, t->len,
+-					DMA_FROM_DEVICE);
+-		}
++	if (host->dma_dev) {
++		dma_sync_single_for_device(host->dma_dev,
++				host->data_dma, sizeof(*scratch),
++				DMA_BIDIRECTIONAL);
++		dma_sync_single_for_device(host->dma_dev,
++				t->rx_dma, t->len,
++				DMA_FROM_DEVICE);
++	}
+ 
+-	} else {
+-		dev_dbg(&spi->dev, "read error %02x (%d)\n", status, status);
++	status = spi_sync(spi, &host->m);
+ 
+-		/* we've read extra garbage, timed out, etc */
+-		if (status < 0)
+-			return status;
++	if (host->dma_dev) {
++		dma_sync_single_for_cpu(host->dma_dev,
++				host->data_dma, sizeof(*scratch),
++				DMA_BIDIRECTIONAL);
++		dma_sync_single_for_cpu(host->dma_dev,
++				t->rx_dma, t->len,
++				DMA_FROM_DEVICE);
++	}
+ 
+-		/* low four bits are an R2 subset, fifth seems to be
+-		 * vendor specific ... map them all to generic error..
++	if (bitshift) {
++		/* Walk through the data and the crc and do
++		 * all the magic to get byte-aligned data.
+ 		 */
+-		return -EIO;
++		u8 *cp = t->rx_buf;
++		unsigned int len;
++		unsigned int bitright = 8 - bitshift;
++		u8 temp;
++		for (len = t->len; len; len--) {
++			temp = *cp;
++			*cp++ = leftover | (temp >> bitshift);
++			leftover = temp << bitright;
++		}
++		cp = (u8 *) &scratch->crc_val;
++		temp = *cp;
++		*cp++ = leftover | (temp >> bitshift);
++		leftover = temp << bitright;
++		temp = *cp;
++		*cp = leftover | (temp >> bitshift);
+ 	}
+ 
+ 	if (host->mmc->use_spi_crc) {
+@@ -779,7 +880,7 @@
+ 	unsigned		n_sg;
+ 	int			multiple = (data->blocks > 1);
+ 	u32			clock_rate;
+-	ktime_t			timeout;
++	unsigned long		timeout;
+ 
+ 	if (data->flags & MMC_DATA_READ)
+ 		direction = DMA_FROM_DEVICE;
+@@ -793,8 +894,9 @@
+ 	else
+ 		clock_rate = spi->max_speed_hz;
+ 
+-	timeout = ktime_add_ns(ktime_set(0, 0), data->timeout_ns +
+-			data->timeout_clks * 1000000 / clock_rate);
++	timeout = data->timeout_ns +
++		  data->timeout_clks * 1000000 / clock_rate;
++	timeout = usecs_to_jiffies((unsigned int)(timeout / 1000)) + 1;
+ 
+ 	/* Handle scatterlist segments one at a time, with synch for
+ 	 * each 512-byte block
+@@ -1204,10 +1306,12 @@
+ 
+ 	/* MMC and SD specs only seem to care that sampling is on the
+ 	 * rising edge ... meaning SPI modes 0 or 3.  So either SPI mode
+-	 * should be legit.  We'll use mode 0 since it seems to be a
+-	 * bit less troublesome on some hardware ... unclear why.
++	 * should be legit.  We'll use mode 0 since the steady state is 0,
++	 * which is appropriate for hotplugging, unless the platform data
++	 * specify mode 3 (if hardware is not compatible to mode 0).
+ 	 */
+-	spi->mode = SPI_MODE_0;
++	if (spi->mode != SPI_MODE_3)
++		spi->mode = SPI_MODE_0;
+ 	spi->bits_per_word = 8;
+ 
+ 	status = spi_setup(spi);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/mvsdio.c linux-2.6.29/drivers/mmc/host/mvsdio.c
+--- linux-2.6.29.ref/drivers/mmc/host/mvsdio.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/drivers/mmc/host/mvsdio.c	2011-05-31 10:42:56.593955579 -0700
+@@ -0,0 +1,919 @@
++/*
++ * Marvell MMC/SD/SDIO driver
++ *
++ * Authors: Maen Suleiman, Nicolas Pitre
++ * Copyright (C) 2008-2009 Marvell Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/platform_device.h>
++#include <linux/mbus.h>
++#include <linux/delay.h>
++#include <linux/interrupt.h>
++#include <linux/dma-mapping.h>
++#include <linux/scatterlist.h>
++#include <linux/irq.h>
++#include <linux/gpio.h>
++#include <linux/mmc/host.h>
++
++#include <asm/sizes.h>
++#include <asm/unaligned.h>
++#include <plat/mvsdio.h>
++
++#include "mvsdio.h"
++
++#define DRIVER_NAME	"mvsdio"
++
++static int maxfreq = MVSD_CLOCKRATE_MAX;
++static int nodma;
++
++struct mvsd_host {
++	void __iomem *base;
++	struct mmc_request *mrq;
++	spinlock_t lock;
++	unsigned int xfer_mode;
++	unsigned int intr_en;
++	unsigned int ctrl;
++	unsigned int pio_size;
++	void *pio_ptr;
++	unsigned int sg_frags;
++	unsigned int ns_per_clk;
++	unsigned int clock;
++	unsigned int base_clock;
++	struct timer_list timer;
++	struct mmc_host *mmc;
++	struct device *dev;
++	struct resource *res;
++	int irq;
++	int gpio_card_detect;
++	int gpio_write_protect;
++};
++
++#define mvsd_write(offs, val)	writel(val, iobase + (offs))
++#define mvsd_read(offs)		readl(iobase + (offs))
++
++static int mvsd_setup_data(struct mvsd_host *host, struct mmc_data *data)
++{
++	void __iomem *iobase = host->base;
++	unsigned int tmout;
++	int tmout_index;
++
++	/*
++	 * Hardware weirdness.  The FIFO_EMPTY bit of the HW_STATE
++	 * register is sometimes not set before a while when some
++	 * "unusual" data block sizes are used (such as with the SWITCH
++	 * command), even despite the fact that the XFER_DONE interrupt
++	 * was raised.  And if another data transfer starts before
++	 * this bit comes to good sense (which eventually happens by
++	 * itself) then the new transfer simply fails with a timeout.
++	 */
++	if (!(mvsd_read(MVSD_HW_STATE) & (1 << 13))) {
++		unsigned long t = jiffies + HZ;
++		unsigned int hw_state,  count = 0;
++		do {
++			if (time_after(jiffies, t)) {
++				dev_warn(host->dev, "FIFO_EMPTY bit missing\n");
++				break;
++			}
++			hw_state = mvsd_read(MVSD_HW_STATE);
++			count++;
++		} while (!(hw_state & (1 << 13)));
++		dev_dbg(host->dev, "*** wait for FIFO_EMPTY bit "
++				   "(hw=0x%04x, count=%d, jiffies=%ld)\n",
++				   hw_state, count, jiffies - (t - HZ));
++	}
++
++	/* If timeout=0 then maximum timeout index is used. */
++	tmout = DIV_ROUND_UP(data->timeout_ns, host->ns_per_clk);
++	tmout += data->timeout_clks;
++	tmout_index = fls(tmout - 1) - 12;
++	if (tmout_index < 0)
++		tmout_index = 0;
++	if (tmout_index > MVSD_HOST_CTRL_TMOUT_MAX)
++		tmout_index = MVSD_HOST_CTRL_TMOUT_MAX;
++
++	dev_dbg(host->dev, "data %s at 0x%08x: blocks=%d blksz=%d tmout=%u (%d)\n",
++		(data->flags & MMC_DATA_READ) ? "read" : "write",
++		(u32)sg_virt(data->sg), data->blocks, data->blksz,
++		tmout, tmout_index);
++
++	host->ctrl &= ~MVSD_HOST_CTRL_TMOUT_MASK;
++	host->ctrl |= MVSD_HOST_CTRL_TMOUT(tmout_index);
++	mvsd_write(MVSD_HOST_CTRL, host->ctrl);
++	mvsd_write(MVSD_BLK_COUNT, data->blocks);
++	mvsd_write(MVSD_BLK_SIZE, data->blksz);
++
++	if (nodma || (data->blksz | data->sg->offset) & 3) {
++		/*
++		 * We cannot do DMA on a buffer which offset or size
++		 * is not aligned on a 4-byte boundary.
++		 */
++		host->pio_size = data->blocks * data->blksz;
++		host->pio_ptr = sg_virt(data->sg);
++		if (!nodma)
++			printk(KERN_DEBUG "%s: fallback to PIO for data "
++					  "at 0x%p size %d\n",
++					  mmc_hostname(host->mmc),
++					  host->pio_ptr, host->pio_size);
++		return 1;
++	} else {
++		dma_addr_t phys_addr;
++		int dma_dir = (data->flags & MMC_DATA_READ) ?
++			DMA_FROM_DEVICE : DMA_TO_DEVICE;
++		host->sg_frags = dma_map_sg(mmc_dev(host->mmc), data->sg,
++					    data->sg_len, dma_dir);
++		phys_addr = sg_dma_address(data->sg);
++		mvsd_write(MVSD_SYS_ADDR_LOW, (u32)phys_addr & 0xffff);
++		mvsd_write(MVSD_SYS_ADDR_HI,  (u32)phys_addr >> 16);
++		return 0;
++	}
++}
++
++static void mvsd_request(struct mmc_host *mmc, struct mmc_request *mrq)
++{
++	struct mvsd_host *host = mmc_priv(mmc);
++	void __iomem *iobase = host->base;
++	struct mmc_command *cmd = mrq->cmd;
++	u32 cmdreg = 0, xfer = 0, intr = 0;
++	unsigned long flags;
++
++	BUG_ON(host->mrq != NULL);
++	host->mrq = mrq;
++
++	dev_dbg(host->dev, "cmd %d (hw state 0x%04x)\n",
++		cmd->opcode, mvsd_read(MVSD_HW_STATE));
++
++	cmdreg = MVSD_CMD_INDEX(cmd->opcode);
++
++	if (cmd->flags & MMC_RSP_BUSY)
++		cmdreg |= MVSD_CMD_RSP_48BUSY;
++	else if (cmd->flags & MMC_RSP_136)
++		cmdreg |= MVSD_CMD_RSP_136;
++	else if (cmd->flags & MMC_RSP_PRESENT)
++		cmdreg |= MVSD_CMD_RSP_48;
++	else
++		cmdreg |= MVSD_CMD_RSP_NONE;
++
++	if (cmd->flags & MMC_RSP_CRC)
++		cmdreg |= MVSD_CMD_CHECK_CMDCRC;
++
++	if (cmd->flags & MMC_RSP_OPCODE)
++		cmdreg |= MVSD_CMD_INDX_CHECK;
++
++	if (cmd->flags & MMC_RSP_PRESENT) {
++		cmdreg |= MVSD_UNEXPECTED_RESP;
++		intr |= MVSD_NOR_UNEXP_RSP;
++	}
++
++	if (mrq->data) {
++		struct mmc_data *data = mrq->data;
++		int pio;
++
++		cmdreg |= MVSD_CMD_DATA_PRESENT | MVSD_CMD_CHECK_DATACRC16;
++		xfer |= MVSD_XFER_MODE_HW_WR_DATA_EN;
++		if (data->flags & MMC_DATA_READ)
++			xfer |= MVSD_XFER_MODE_TO_HOST;
++
++		pio = mvsd_setup_data(host, data);
++		if (pio) {
++			xfer |= MVSD_XFER_MODE_PIO;
++			/* PIO section of mvsd_irq has comments on those bits */
++			if (data->flags & MMC_DATA_WRITE)
++				intr |= MVSD_NOR_TX_AVAIL;
++			else if (host->pio_size > 32)
++				intr |= MVSD_NOR_RX_FIFO_8W;
++			else
++				intr |= MVSD_NOR_RX_READY;
++		}
++
++		if (data->stop) {
++			struct mmc_command *stop = data->stop;
++			u32 cmd12reg = 0;
++
++			mvsd_write(MVSD_AUTOCMD12_ARG_LOW, stop->arg & 0xffff);
++			mvsd_write(MVSD_AUTOCMD12_ARG_HI,  stop->arg >> 16);
++
++			if (stop->flags & MMC_RSP_BUSY)
++				cmd12reg |= MVSD_AUTOCMD12_BUSY;
++			if (stop->flags & MMC_RSP_OPCODE)
++				cmd12reg |= MVSD_AUTOCMD12_INDX_CHECK;
++			cmd12reg |= MVSD_AUTOCMD12_INDEX(stop->opcode);
++			mvsd_write(MVSD_AUTOCMD12_CMD, cmd12reg);
++
++			xfer |= MVSD_XFER_MODE_AUTO_CMD12;
++			intr |= MVSD_NOR_AUTOCMD12_DONE;
++		} else {
++			intr |= MVSD_NOR_XFER_DONE;
++		}
++	} else {
++		intr |= MVSD_NOR_CMD_DONE;
++	}
++
++	mvsd_write(MVSD_ARG_LOW, cmd->arg & 0xffff);
++	mvsd_write(MVSD_ARG_HI,  cmd->arg >> 16);
++
++	spin_lock_irqsave(&host->lock, flags);
++
++	host->xfer_mode &= MVSD_XFER_MODE_INT_CHK_EN;
++	host->xfer_mode |= xfer;
++	mvsd_write(MVSD_XFER_MODE, host->xfer_mode);
++
++	mvsd_write(MVSD_NOR_INTR_STATUS, ~MVSD_NOR_CARD_INT);
++	mvsd_write(MVSD_ERR_INTR_STATUS, 0xffff);
++	mvsd_write(MVSD_CMD, cmdreg);
++
++	host->intr_en &= MVSD_NOR_CARD_INT;
++	host->intr_en |= intr | MVSD_NOR_ERROR;
++	mvsd_write(MVSD_NOR_INTR_EN, host->intr_en);
++	mvsd_write(MVSD_ERR_INTR_EN, 0xffff);
++
++	mod_timer(&host->timer, jiffies + 5 * HZ);
++
++	spin_unlock_irqrestore(&host->lock, flags);
++}
++
++static u32 mvsd_finish_cmd(struct mvsd_host *host, struct mmc_command *cmd,
++			   u32 err_status)
++{
++	void __iomem *iobase = host->base;
++
++	if (cmd->flags & MMC_RSP_136) {
++		unsigned int response[8], i;
++		for (i = 0; i < 8; i++)
++			response[i] = mvsd_read(MVSD_RSP(i));
++		cmd->resp[0] =		((response[0] & 0x03ff) << 22) |
++					((response[1] & 0xffff) << 6) |
++					((response[2] & 0xfc00) >> 10);
++		cmd->resp[1] =		((response[2] & 0x03ff) << 22) |
++					((response[3] & 0xffff) << 6) |
++					((response[4] & 0xfc00) >> 10);
++		cmd->resp[2] =		((response[4] & 0x03ff) << 22) |
++					((response[5] & 0xffff) << 6) |
++					((response[6] & 0xfc00) >> 10);
++		cmd->resp[3] =		((response[6] & 0x03ff) << 22) |
++					((response[7] & 0x3fff) << 8);
++	} else if (cmd->flags & MMC_RSP_PRESENT) {
++		unsigned int response[3], i;
++		for (i = 0; i < 3; i++)
++			response[i] = mvsd_read(MVSD_RSP(i));
++		cmd->resp[0] =		((response[2] & 0x003f) << (8 - 8)) |
++					((response[1] & 0xffff) << (14 - 8)) |
++					((response[0] & 0x03ff) << (30 - 8));
++		cmd->resp[1] =		((response[0] & 0xfc00) >> 10);
++		cmd->resp[2] = 0;
++		cmd->resp[3] = 0;
++	}
++
++	if (err_status & MVSD_ERR_CMD_TIMEOUT) {
++		cmd->error = -ETIMEDOUT;
++	} else if (err_status & (MVSD_ERR_CMD_CRC | MVSD_ERR_CMD_ENDBIT |
++				 MVSD_ERR_CMD_INDEX | MVSD_ERR_CMD_STARTBIT)) {
++		cmd->error = -EILSEQ;
++	}
++	err_status &= ~(MVSD_ERR_CMD_TIMEOUT | MVSD_ERR_CMD_CRC |
++			MVSD_ERR_CMD_ENDBIT | MVSD_ERR_CMD_INDEX |
++			MVSD_ERR_CMD_STARTBIT);
++
++	return err_status;
++}
++
++static u32 mvsd_finish_data(struct mvsd_host *host, struct mmc_data *data,
++			    u32 err_status)
++{
++	void __iomem *iobase = host->base;
++
++	if (host->pio_ptr) {
++		host->pio_ptr = NULL;
++		host->pio_size = 0;
++	} else {
++		dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->sg_frags,
++			     (data->flags & MMC_DATA_READ) ?
++				DMA_FROM_DEVICE : DMA_TO_DEVICE);
++	}
++
++	if (err_status & MVSD_ERR_DATA_TIMEOUT)
++		data->error = -ETIMEDOUT;
++	else if (err_status & (MVSD_ERR_DATA_CRC | MVSD_ERR_DATA_ENDBIT))
++		data->error = -EILSEQ;
++	else if (err_status & MVSD_ERR_XFER_SIZE)
++		data->error = -EBADE;
++	err_status &= ~(MVSD_ERR_DATA_TIMEOUT | MVSD_ERR_DATA_CRC |
++			MVSD_ERR_DATA_ENDBIT | MVSD_ERR_XFER_SIZE);
++
++	dev_dbg(host->dev, "data done: blocks_left=%d, bytes_left=%d\n",
++		mvsd_read(MVSD_CURR_BLK_LEFT), mvsd_read(MVSD_CURR_BYTE_LEFT));
++	data->bytes_xfered =
++		(data->blocks - mvsd_read(MVSD_CURR_BLK_LEFT)) * data->blksz;
++	/* We can't be sure about the last block when errors are detected */
++	if (data->bytes_xfered && data->error)
++		data->bytes_xfered -= data->blksz;
++
++	/* Handle Auto cmd 12 response */
++	if (data->stop) {
++		unsigned int response[3], i;
++		for (i = 0; i < 3; i++)
++			response[i] = mvsd_read(MVSD_AUTO_RSP(i));
++		data->stop->resp[0] =	((response[2] & 0x003f) << (8 - 8)) |
++					((response[1] & 0xffff) << (14 - 8)) |
++					((response[0] & 0x03ff) << (30 - 8));
++		data->stop->resp[1] =	((response[0] & 0xfc00) >> 10);
++		data->stop->resp[2] = 0;
++		data->stop->resp[3] = 0;
++
++		if (err_status & MVSD_ERR_AUTOCMD12) {
++			u32 err_cmd12 = mvsd_read(MVSD_AUTOCMD12_ERR_STATUS);
++			dev_dbg(host->dev, "c12err 0x%04x\n", err_cmd12);
++			if (err_cmd12 & MVSD_AUTOCMD12_ERR_NOTEXE)
++				data->stop->error = -ENOEXEC;
++			else if (err_cmd12 & MVSD_AUTOCMD12_ERR_TIMEOUT)
++				data->stop->error = -ETIMEDOUT;
++			else if (err_cmd12)
++				data->stop->error = -EILSEQ;
++			err_status &= ~MVSD_ERR_AUTOCMD12;
++		}
++	}
++
++	return err_status;
++}
++
++static irqreturn_t mvsd_irq(int irq, void *dev)
++{
++	struct mvsd_host *host = dev;
++	void __iomem *iobase = host->base;
++	u32 intr_status, intr_done_mask;
++	int irq_handled = 0;
++
++	intr_status = mvsd_read(MVSD_NOR_INTR_STATUS);
++	dev_dbg(host->dev, "intr 0x%04x intr_en 0x%04x hw_state 0x%04x\n",
++		intr_status, mvsd_read(MVSD_NOR_INTR_EN),
++		mvsd_read(MVSD_HW_STATE));
++
++	spin_lock(&host->lock);
++
++	/* PIO handling, if needed. Messy business... */
++	if (host->pio_size &&
++	    (intr_status & host->intr_en &
++	     (MVSD_NOR_RX_READY | MVSD_NOR_RX_FIFO_8W))) {
++		u16 *p = host->pio_ptr;
++		int s = host->pio_size;
++		while (s >= 32 && (intr_status & MVSD_NOR_RX_FIFO_8W)) {
++			readsw(iobase + MVSD_FIFO, p, 16);
++			p += 16;
++			s -= 32;
++			intr_status = mvsd_read(MVSD_NOR_INTR_STATUS);
++		}
++		/*
++		 * Normally we'd use < 32 here, but the RX_FIFO_8W bit
++		 * doesn't appear to assert when there is exactly 32 bytes
++		 * (8 words) left to fetch in a transfer.
++		 */
++		if (s <= 32) {
++			while (s >= 4 && (intr_status & MVSD_NOR_RX_READY)) {
++				put_unaligned(mvsd_read(MVSD_FIFO), p++);
++				put_unaligned(mvsd_read(MVSD_FIFO), p++);
++				s -= 4;
++				intr_status = mvsd_read(MVSD_NOR_INTR_STATUS);
++			}
++			if (s && s < 4 && (intr_status & MVSD_NOR_RX_READY)) {
++				u16 val[2] = {0, 0};
++				val[0] = mvsd_read(MVSD_FIFO);
++				val[1] = mvsd_read(MVSD_FIFO);
++				memcpy(p, ((void *)&val) + 4 - s, s);
++				s = 0;
++				intr_status = mvsd_read(MVSD_NOR_INTR_STATUS);
++			}
++			if (s == 0) {
++				host->intr_en &=
++				     ~(MVSD_NOR_RX_READY | MVSD_NOR_RX_FIFO_8W);
++				mvsd_write(MVSD_NOR_INTR_EN, host->intr_en);
++			} else if (host->intr_en & MVSD_NOR_RX_FIFO_8W) {
++				host->intr_en &= ~MVSD_NOR_RX_FIFO_8W;
++				host->intr_en |= MVSD_NOR_RX_READY;
++				mvsd_write(MVSD_NOR_INTR_EN, host->intr_en);
++			}
++		}
++		dev_dbg(host->dev, "pio %d intr 0x%04x hw_state 0x%04x\n",
++			s, intr_status, mvsd_read(MVSD_HW_STATE));
++		host->pio_ptr = p;
++		host->pio_size = s;
++		irq_handled = 1;
++	} else if (host->pio_size &&
++		   (intr_status & host->intr_en &
++		    (MVSD_NOR_TX_AVAIL | MVSD_NOR_TX_FIFO_8W))) {
++		u16 *p = host->pio_ptr;
++		int s = host->pio_size;
++		/*
++		 * The TX_FIFO_8W bit is unreliable. When set, bursting
++		 * 16 halfwords all at once in the FIFO drops data. Actually
++		 * TX_AVAIL does go off after only one word is pushed even if
++		 * TX_FIFO_8W remains set.
++		 */
++		while (s >= 4 && (intr_status & MVSD_NOR_TX_AVAIL)) {
++			mvsd_write(MVSD_FIFO, get_unaligned(p++));
++			mvsd_write(MVSD_FIFO, get_unaligned(p++));
++			s -= 4;
++			intr_status = mvsd_read(MVSD_NOR_INTR_STATUS);
++		}
++		if (s < 4) {
++			if (s && (intr_status & MVSD_NOR_TX_AVAIL)) {
++				u16 val[2] = {0, 0};
++				memcpy(((void *)&val) + 4 - s, p, s);
++				mvsd_write(MVSD_FIFO, val[0]);
++				mvsd_write(MVSD_FIFO, val[1]);
++				s = 0;
++				intr_status = mvsd_read(MVSD_NOR_INTR_STATUS);
++			}
++			if (s == 0) {
++				host->intr_en &=
++				     ~(MVSD_NOR_TX_AVAIL | MVSD_NOR_TX_FIFO_8W);
++				mvsd_write(MVSD_NOR_INTR_EN, host->intr_en);
++			}
++		}
++		dev_dbg(host->dev, "pio %d intr 0x%04x hw_state 0x%04x\n",
++			s, intr_status, mvsd_read(MVSD_HW_STATE));
++		host->pio_ptr = p;
++		host->pio_size = s;
++		irq_handled = 1;
++	}
++
++	mvsd_write(MVSD_NOR_INTR_STATUS, intr_status);
++
++	intr_done_mask = MVSD_NOR_CARD_INT | MVSD_NOR_RX_READY |
++			 MVSD_NOR_RX_FIFO_8W | MVSD_NOR_TX_FIFO_8W;
++	if (intr_status & host->intr_en & ~intr_done_mask) {
++		struct mmc_request *mrq = host->mrq;
++		struct mmc_command *cmd = mrq->cmd;
++		u32 err_status = 0;
++
++		del_timer(&host->timer);
++		host->mrq = NULL;
++
++		host->intr_en &= MVSD_NOR_CARD_INT;
++		mvsd_write(MVSD_NOR_INTR_EN, host->intr_en);
++		mvsd_write(MVSD_ERR_INTR_EN, 0);
++
++		spin_unlock(&host->lock);
++
++		if (intr_status & MVSD_NOR_UNEXP_RSP) {
++			cmd->error = -EPROTO;
++		} else if (intr_status & MVSD_NOR_ERROR) {
++			err_status = mvsd_read(MVSD_ERR_INTR_STATUS);
++			dev_dbg(host->dev, "err 0x%04x\n", err_status);
++		}
++
++		err_status = mvsd_finish_cmd(host, cmd, err_status);
++		if (mrq->data)
++			err_status = mvsd_finish_data(host, mrq->data, err_status);
++		if (err_status) {
++			printk(KERN_ERR "%s: unhandled error status %#04x\n",
++					mmc_hostname(host->mmc), err_status);
++			cmd->error = -ENOMSG;
++		}
++
++		mmc_request_done(host->mmc, mrq);
++		irq_handled = 1;
++	} else
++		spin_unlock(&host->lock);
++
++	if (intr_status & MVSD_NOR_CARD_INT) {
++		mmc_signal_sdio_irq(host->mmc);
++		irq_handled = 1;
++	}
++
++	if (irq_handled)
++		return IRQ_HANDLED;
++
++	printk(KERN_ERR "%s: unhandled interrupt status=0x%04x en=0x%04x "
++			"pio=%d\n", mmc_hostname(host->mmc), intr_status,
++			host->intr_en, host->pio_size);
++	return IRQ_NONE;
++}
++
++static void mvsd_timeout_timer(unsigned long data)
++{
++	struct mvsd_host *host = (struct mvsd_host *)data;
++	void __iomem *iobase = host->base;
++	struct mmc_request *mrq;
++	unsigned long flags;
++
++	spin_lock_irqsave(&host->lock, flags);
++	mrq = host->mrq;
++	if (mrq) {
++		printk(KERN_ERR "%s: Timeout waiting for hardware interrupt.\n",
++				mmc_hostname(host->mmc));
++		printk(KERN_ERR "%s: hw_state=0x%04x, intr_status=0x%04x "
++				"intr_en=0x%04x\n", mmc_hostname(host->mmc),
++				mvsd_read(MVSD_HW_STATE),
++				mvsd_read(MVSD_NOR_INTR_STATUS),
++				mvsd_read(MVSD_NOR_INTR_EN));
++
++		host->mrq = NULL;
++
++		mvsd_write(MVSD_SW_RESET, MVSD_SW_RESET_NOW);
++
++		host->xfer_mode &= MVSD_XFER_MODE_INT_CHK_EN;
++		mvsd_write(MVSD_XFER_MODE, host->xfer_mode);
++
++		host->intr_en &= MVSD_NOR_CARD_INT;
++		mvsd_write(MVSD_NOR_INTR_EN, host->intr_en);
++		mvsd_write(MVSD_ERR_INTR_EN, 0);
++		mvsd_write(MVSD_ERR_INTR_STATUS, 0xffff);
++
++		mrq->cmd->error = -ETIMEDOUT;
++		mvsd_finish_cmd(host, mrq->cmd, 0);
++		if (mrq->data) {
++			mrq->data->error = -ETIMEDOUT;
++			mvsd_finish_data(host, mrq->data, 0);
++		}
++	}
++	spin_unlock_irqrestore(&host->lock, flags);
++
++	if (mrq)
++		mmc_request_done(host->mmc, mrq);
++}
++
++static irqreturn_t mvsd_card_detect_irq(int irq, void *dev)
++{
++	struct mvsd_host *host = dev;
++	mmc_detect_change(host->mmc, msecs_to_jiffies(100));
++	return IRQ_HANDLED;
++}
++
++static void mvsd_enable_sdio_irq(struct mmc_host *mmc, int enable)
++{
++	struct mvsd_host *host = mmc_priv(mmc);
++	void __iomem *iobase = host->base;
++	unsigned long flags;
++
++	spin_lock_irqsave(&host->lock, flags);
++	if (enable) {
++		host->xfer_mode |= MVSD_XFER_MODE_INT_CHK_EN;
++		host->intr_en |= MVSD_NOR_CARD_INT;
++	} else {
++		host->xfer_mode &= ~MVSD_XFER_MODE_INT_CHK_EN;
++		host->intr_en &= ~MVSD_NOR_CARD_INT;
++	}
++	mvsd_write(MVSD_XFER_MODE, host->xfer_mode);
++	mvsd_write(MVSD_NOR_INTR_EN, host->intr_en);
++	spin_unlock_irqrestore(&host->lock, flags);
++}
++
++static int mvsd_get_ro(struct mmc_host *mmc)
++{
++	struct mvsd_host *host = mmc_priv(mmc);
++
++	if (host->gpio_write_protect)
++		return gpio_get_value(host->gpio_write_protect);
++
++	/*
++	 * Board doesn't support read only detection; let the mmc core
++	 * decide what to do.
++	 */
++	return -ENOSYS;
++}
++
++static void mvsd_power_up(struct mvsd_host *host)
++{
++	void __iomem *iobase = host->base;
++	dev_dbg(host->dev, "power up\n");
++	mvsd_write(MVSD_NOR_INTR_EN, 0);
++	mvsd_write(MVSD_ERR_INTR_EN, 0);
++	mvsd_write(MVSD_SW_RESET, MVSD_SW_RESET_NOW);
++	mvsd_write(MVSD_XFER_MODE, 0);
++	mvsd_write(MVSD_NOR_STATUS_EN, 0xffff);
++	mvsd_write(MVSD_ERR_STATUS_EN, 0xffff);
++	mvsd_write(MVSD_NOR_INTR_STATUS, 0xffff);
++	mvsd_write(MVSD_ERR_INTR_STATUS, 0xffff);
++}
++
++static void mvsd_power_down(struct mvsd_host *host)
++{
++	void __iomem *iobase = host->base;
++	dev_dbg(host->dev, "power down\n");
++	mvsd_write(MVSD_NOR_INTR_EN, 0);
++	mvsd_write(MVSD_ERR_INTR_EN, 0);
++	mvsd_write(MVSD_SW_RESET, MVSD_SW_RESET_NOW);
++	mvsd_write(MVSD_XFER_MODE, MVSD_XFER_MODE_STOP_CLK);
++	mvsd_write(MVSD_NOR_STATUS_EN, 0);
++	mvsd_write(MVSD_ERR_STATUS_EN, 0);
++	mvsd_write(MVSD_NOR_INTR_STATUS, 0xffff);
++	mvsd_write(MVSD_ERR_INTR_STATUS, 0xffff);
++}
++
++static void mvsd_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
++{
++	struct mvsd_host *host = mmc_priv(mmc);
++	void __iomem *iobase = host->base;
++	u32 ctrl_reg = 0;
++
++	if (ios->power_mode == MMC_POWER_UP)
++		mvsd_power_up(host);
++
++	if (ios->clock == 0) {
++		mvsd_write(MVSD_XFER_MODE, MVSD_XFER_MODE_STOP_CLK);
++		mvsd_write(MVSD_CLK_DIV, MVSD_BASE_DIV_MAX);
++		host->clock = 0;
++		dev_dbg(host->dev, "clock off\n");
++	} else if (ios->clock != host->clock) {
++		u32 m = DIV_ROUND_UP(host->base_clock, ios->clock) - 1;
++		if (m > MVSD_BASE_DIV_MAX)
++			m = MVSD_BASE_DIV_MAX;
++		mvsd_write(MVSD_CLK_DIV, m);
++		host->clock = ios->clock;
++		host->ns_per_clk = 1000000000 / (host->base_clock / (m+1));
++		dev_dbg(host->dev, "clock=%d (%d), div=0x%04x\n",
++			ios->clock, host->base_clock / (m+1), m);
++	}
++
++	/* default transfer mode */
++	ctrl_reg |= MVSD_HOST_CTRL_BIG_ENDIAN;
++	ctrl_reg &= ~MVSD_HOST_CTRL_LSB_FIRST;
++
++	/* default to maximum timeout */
++	ctrl_reg |= MVSD_HOST_CTRL_TMOUT_MASK;
++	ctrl_reg |= MVSD_HOST_CTRL_TMOUT_EN;
++
++	if (ios->bus_mode == MMC_BUSMODE_PUSHPULL)
++		ctrl_reg |= MVSD_HOST_CTRL_PUSH_PULL_EN;
++
++	if (ios->bus_width == MMC_BUS_WIDTH_4)
++		ctrl_reg |= MVSD_HOST_CTRL_DATA_WIDTH_4_BITS;
++
++	/*
++	 * The HI_SPEED_EN bit is causing trouble with many (but not all)
++	 * high speed SD, SDHC and SDIO cards.  Not enabling that bit
++	 * makes all cards work.  So let's just ignore that bit for now
++	 * and revisit this issue if problems for not enabling this bit
++	 * are ever reported.
++	 */
++#if 0
++	if (ios->timing == MMC_TIMING_MMC_HS ||
++	    ios->timing == MMC_TIMING_SD_HS)
++		ctrl_reg |= MVSD_HOST_CTRL_HI_SPEED_EN;
++#endif
++
++	host->ctrl = ctrl_reg;
++	mvsd_write(MVSD_HOST_CTRL, ctrl_reg);
++	dev_dbg(host->dev, "ctrl 0x%04x: %s %s %s\n", ctrl_reg,
++		(ctrl_reg & MVSD_HOST_CTRL_PUSH_PULL_EN) ?
++			"push-pull" : "open-drain",
++		(ctrl_reg & MVSD_HOST_CTRL_DATA_WIDTH_4_BITS) ?
++			"4bit-width" : "1bit-width",
++		(ctrl_reg & MVSD_HOST_CTRL_HI_SPEED_EN) ?
++			"high-speed" : "");
++
++	if (ios->power_mode == MMC_POWER_OFF)
++		mvsd_power_down(host);
++}
++
++static const struct mmc_host_ops mvsd_ops = {
++	.request		= mvsd_request,
++	.get_ro			= mvsd_get_ro,
++	.set_ios		= mvsd_set_ios,
++	.enable_sdio_irq	= mvsd_enable_sdio_irq,
++};
++
++static void __init mv_conf_mbus_windows(struct mvsd_host *host,
++					struct mbus_dram_target_info *dram)
++{
++	void __iomem *iobase = host->base;
++	int i;
++
++	for (i = 0; i < 4; i++) {
++		writel(0, iobase + MVSD_WINDOW_CTRL(i));
++		writel(0, iobase + MVSD_WINDOW_BASE(i));
++	}
++
++	for (i = 0; i < dram->num_cs; i++) {
++		struct mbus_dram_window *cs = dram->cs + i;
++		writel(((cs->size - 1) & 0xffff0000) |
++		       (cs->mbus_attr << 8) |
++		       (dram->mbus_dram_target_id << 4) | 1,
++		       iobase + MVSD_WINDOW_CTRL(i));
++		writel(cs->base, iobase + MVSD_WINDOW_BASE(i));
++	}
++}
++
++static int __init mvsd_probe(struct platform_device *pdev)
++{
++	struct mmc_host *mmc = NULL;
++	struct mvsd_host *host = NULL;
++	const struct mvsdio_platform_data *mvsd_data;
++	struct resource *r;
++	int ret, irq;
++
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	irq = platform_get_irq(pdev, 0);
++	mvsd_data = pdev->dev.platform_data;
++	if (!r || irq < 0 || !mvsd_data)
++		return -ENXIO;
++
++	r = request_mem_region(r->start, SZ_1K, DRIVER_NAME);
++	if (!r)
++		return -EBUSY;
++
++	mmc = mmc_alloc_host(sizeof(struct mvsd_host), &pdev->dev);
++	if (!mmc) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	host = mmc_priv(mmc);
++	host->mmc = mmc;
++	host->dev = &pdev->dev;
++	host->res = r;
++	host->base_clock = mvsd_data->clock / 2;
++
++	mmc->ops = &mvsd_ops;
++
++	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
++	mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ |
++		    MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED;
++
++	mmc->f_min = DIV_ROUND_UP(host->base_clock, MVSD_BASE_DIV_MAX);
++	mmc->f_max = maxfreq;
++
++	mmc->max_blk_size = 2048;
++	mmc->max_blk_count = 65535;
++
++	mmc->max_hw_segs = 1;
++	mmc->max_phys_segs = 1;
++	mmc->max_seg_size = mmc->max_blk_size * mmc->max_blk_count;
++	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
++
++	spin_lock_init(&host->lock);
++
++	host->base = ioremap(r->start, SZ_4K);
++	if (!host->base) {
++		ret = -ENOMEM;
++		goto out;
++	}
++
++	/* (Re-)program MBUS remapping windows if we are asked to. */
++	if (mvsd_data->dram != NULL)
++		mv_conf_mbus_windows(host, mvsd_data->dram);
++
++	mvsd_power_down(host);
++
++	ret = request_irq(irq, mvsd_irq, 0, DRIVER_NAME, host);
++	if (ret) {
++		printk(KERN_ERR "%s: cannot assign irq %d\n", DRIVER_NAME, irq);
++		goto out;
++	} else
++		host->irq = irq;
++
++	if (mvsd_data->gpio_card_detect) {
++		ret = gpio_request(mvsd_data->gpio_card_detect,
++				   DRIVER_NAME " cd");
++		if (ret == 0) {
++			gpio_direction_input(mvsd_data->gpio_card_detect);
++			irq = gpio_to_irq(mvsd_data->gpio_card_detect);
++			ret = request_irq(irq, mvsd_card_detect_irq,
++					  IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING,
++					  DRIVER_NAME " cd", host);
++			if (ret == 0)
++				host->gpio_card_detect =
++					mvsd_data->gpio_card_detect;
++			else
++				gpio_free(mvsd_data->gpio_card_detect);
++		}
++	}
++	if (!host->gpio_card_detect)
++		mmc->caps |= MMC_CAP_NEEDS_POLL;
++
++	if (mvsd_data->gpio_write_protect) {
++		ret = gpio_request(mvsd_data->gpio_write_protect,
++				   DRIVER_NAME " wp");
++		if (ret == 0) {
++			gpio_direction_input(mvsd_data->gpio_write_protect);
++			host->gpio_write_protect =
++				mvsd_data->gpio_write_protect;
++		}
++	}
++
++	setup_timer(&host->timer, mvsd_timeout_timer, (unsigned long)host);
++	platform_set_drvdata(pdev, mmc);
++	ret = mmc_add_host(mmc);
++	if (ret)
++		goto out;
++
++	printk(KERN_NOTICE "%s: %s driver initialized, ",
++			   mmc_hostname(mmc), DRIVER_NAME);
++	if (host->gpio_card_detect)
++		printk("using GPIO %d for card detection\n",
++		       host->gpio_card_detect);
++	else
++		printk("lacking card detect (fall back to polling)\n");
++	return 0;
++
++out:
++	if (host) {
++		if (host->irq)
++			free_irq(host->irq, host);
++		if (host->gpio_card_detect) {
++			free_irq(gpio_to_irq(host->gpio_card_detect), host);
++			gpio_free(host->gpio_card_detect);
++		}
++		if (host->gpio_write_protect)
++			gpio_free(host->gpio_write_protect);
++		if (host->base)
++			iounmap(host->base);
++	}
++	if (r)
++		release_resource(r);
++	if (mmc)
++		mmc_free_host(mmc);
++
++	return ret;
++}
++
++static int __exit mvsd_remove(struct platform_device *pdev)
++{
++	struct mmc_host *mmc = platform_get_drvdata(pdev);
++
++	if (mmc) {
++		struct mvsd_host *host = mmc_priv(mmc);
++
++		if (host->gpio_card_detect) {
++			free_irq(gpio_to_irq(host->gpio_card_detect), host);
++			gpio_free(host->gpio_card_detect);
++		}
++		mmc_remove_host(mmc);
++		free_irq(host->irq, host);
++		if (host->gpio_write_protect)
++			gpio_free(host->gpio_write_protect);
++		del_timer_sync(&host->timer);
++		mvsd_power_down(host);
++		iounmap(host->base);
++		release_resource(host->res);
++		mmc_free_host(mmc);
++	}
++	platform_set_drvdata(pdev, NULL);
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int mvsd_suspend(struct platform_device *dev, pm_message_t state)
++{
++	struct mmc_host *mmc = platform_get_drvdata(dev);
++	int ret = 0;
++
++	if (mmc)
++		ret = mmc_suspend_host(mmc, state);
++
++	return ret;
++}
++
++static int mvsd_resume(struct platform_device *dev)
++{
++	struct mmc_host *mmc = platform_get_drvdata(dev);
++	int ret = 0;
++
++	if (mmc)
++		ret = mmc_resume_host(mmc);
++
++	return ret;
++}
++#else
++#define mvsd_suspend	NULL
++#define mvsd_resume	NULL
++#endif
++
++static struct platform_driver mvsd_driver = {
++	.remove		= __exit_p(mvsd_remove),
++	.suspend	= mvsd_suspend,
++	.resume		= mvsd_resume,
++	.driver		= {
++		.name	= DRIVER_NAME,
++	},
++};
++
++static int __init mvsd_init(void)
++{
++	return platform_driver_probe(&mvsd_driver, mvsd_probe);
++}
++
++static void __exit mvsd_exit(void)
++{
++	platform_driver_unregister(&mvsd_driver);
++}
++
++module_init(mvsd_init);
++module_exit(mvsd_exit);
++
++/* maximum card clock frequency (default 50MHz) */
++module_param(maxfreq, int, 0);
++
++/* force PIO transfers all the time */
++module_param(nodma, int, 0);
++
++MODULE_AUTHOR("Maen Suleiman, Nicolas Pitre");
++MODULE_DESCRIPTION("Marvell MMC,SD,SDIO Host Controller driver");
++MODULE_LICENSE("GPL");
++MODULE_ALIAS("platform:mvsdio");
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/mvsdio.h linux-2.6.29/drivers/mmc/host/mvsdio.h
+--- linux-2.6.29.ref/drivers/mmc/host/mvsdio.h	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/drivers/mmc/host/mvsdio.h	2011-05-31 10:42:56.603953873 -0700
+@@ -0,0 +1,190 @@
++/*
++ *  Copyright (C) 2008 Marvell Semiconductors, All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __MVSDIO_H
++#define __MVSDIO_H
++
++/*
++ * Clock rates
++ */
++
++#define MVSD_CLOCKRATE_MAX			50000000
++#define MVSD_BASE_DIV_MAX			0x7ff
++
++
++/*
++ * Register offsets
++ */
++
++#define MVSD_SYS_ADDR_LOW			0x000
++#define MVSD_SYS_ADDR_HI			0x004
++#define MVSD_BLK_SIZE				0x008
++#define MVSD_BLK_COUNT				0x00c
++#define MVSD_ARG_LOW				0x010
++#define MVSD_ARG_HI				0x014
++#define MVSD_XFER_MODE				0x018
++#define MVSD_CMD				0x01c
++#define MVSD_RSP(i)				(0x020 + ((i)<<2))
++#define MVSD_RSP0				0x020
++#define MVSD_RSP1				0x024
++#define MVSD_RSP2				0x028
++#define MVSD_RSP3				0x02c
++#define MVSD_RSP4				0x030
++#define MVSD_RSP5				0x034
++#define MVSD_RSP6				0x038
++#define MVSD_RSP7				0x03c
++#define MVSD_FIFO				0x040
++#define MVSD_RSP_CRC7				0x044
++#define MVSD_HW_STATE				0x048
++#define MVSD_HOST_CTRL				0x050
++#define MVSD_BLK_GAP_CTRL			0x054
++#define MVSD_CLK_CTRL				0x058
++#define MVSD_SW_RESET				0x05c
++#define MVSD_NOR_INTR_STATUS			0x060
++#define MVSD_ERR_INTR_STATUS			0x064
++#define MVSD_NOR_STATUS_EN			0x068
++#define MVSD_ERR_STATUS_EN			0x06c
++#define MVSD_NOR_INTR_EN			0x070
++#define MVSD_ERR_INTR_EN			0x074
++#define MVSD_AUTOCMD12_ERR_STATUS		0x078
++#define MVSD_CURR_BYTE_LEFT			0x07c
++#define MVSD_CURR_BLK_LEFT			0x080
++#define MVSD_AUTOCMD12_ARG_LOW			0x084
++#define MVSD_AUTOCMD12_ARG_HI			0x088
++#define MVSD_AUTOCMD12_CMD			0x08c
++#define MVSD_AUTO_RSP(i)			(0x090 + ((i)<<2))
++#define MVSD_AUTO_RSP0				0x090
++#define MVSD_AUTO_RSP1				0x094
++#define MVSD_AUTO_RSP2				0x098
++#define MVSD_CLK_DIV				0x128
++
++#define MVSD_WINDOW_CTRL(i)			(0x108 + ((i) << 3))
++#define MVSD_WINDOW_BASE(i)			(0x10c + ((i) << 3))
++
++
++/*
++ * MVSD_CMD
++ */
++
++#define MVSD_CMD_RSP_NONE			(0 << 0)
++#define MVSD_CMD_RSP_136			(1 << 0)
++#define MVSD_CMD_RSP_48				(2 << 0)
++#define MVSD_CMD_RSP_48BUSY			(3 << 0)
++
++#define MVSD_CMD_CHECK_DATACRC16		(1 << 2)
++#define MVSD_CMD_CHECK_CMDCRC			(1 << 3)
++#define MVSD_CMD_INDX_CHECK			(1 << 4)
++#define MVSD_CMD_DATA_PRESENT			(1 << 5)
++#define MVSD_UNEXPECTED_RESP			(1 << 7)
++#define MVSD_CMD_INDEX(x)			((x) << 8)
++
++
++/*
++ * MVSD_AUTOCMD12_CMD
++ */
++
++#define MVSD_AUTOCMD12_BUSY			(1 << 0)
++#define MVSD_AUTOCMD12_INDX_CHECK		(1 << 1)
++#define MVSD_AUTOCMD12_INDEX(x)			((x) << 8)
++
++/*
++ * MVSD_XFER_MODE
++ */
++
++#define MVSD_XFER_MODE_WR_DATA_START		(1 << 0)
++#define MVSD_XFER_MODE_HW_WR_DATA_EN		(1 << 1)
++#define MVSD_XFER_MODE_AUTO_CMD12		(1 << 2)
++#define MVSD_XFER_MODE_INT_CHK_EN		(1 << 3)
++#define MVSD_XFER_MODE_TO_HOST			(1 << 4)
++#define MVSD_XFER_MODE_STOP_CLK			(1 << 5)
++#define MVSD_XFER_MODE_PIO			(1 << 6)
++
++
++/*
++ * MVSD_HOST_CTRL
++ */
++
++#define MVSD_HOST_CTRL_PUSH_PULL_EN 		(1 << 0)
++
++#define MVSD_HOST_CTRL_CARD_TYPE_MEM_ONLY 	(0 << 1)
++#define MVSD_HOST_CTRL_CARD_TYPE_IO_ONLY 	(1 << 1)
++#define MVSD_HOST_CTRL_CARD_TYPE_IO_MEM_COMBO 	(2 << 1)
++#define MVSD_HOST_CTRL_CARD_TYPE_IO_MMC 	(3 << 1)
++#define MVSD_HOST_CTRL_CARD_TYPE_MASK	 	(3 << 1)
++
++#define MVSD_HOST_CTRL_BIG_ENDIAN 		(1 << 3)
++#define MVSD_HOST_CTRL_LSB_FIRST 		(1 << 4)
++#define MVSD_HOST_CTRL_DATA_WIDTH_4_BITS 	(1 << 9)
++#define MVSD_HOST_CTRL_HI_SPEED_EN 		(1 << 10)
++
++#define MVSD_HOST_CTRL_TMOUT_MAX 		0xf
++#define MVSD_HOST_CTRL_TMOUT_MASK 		(0xf << 11)
++#define MVSD_HOST_CTRL_TMOUT(x) 		((x) << 11)
++#define MVSD_HOST_CTRL_TMOUT_EN 		(1 << 15)
++
++
++/*
++ * MVSD_SW_RESET
++ */
++
++#define MVSD_SW_RESET_NOW			(1 << 8)
++
++
++/*
++ * Normal interrupt status bits
++ */
++
++#define MVSD_NOR_CMD_DONE			(1 << 0)
++#define MVSD_NOR_XFER_DONE			(1 << 1)
++#define MVSD_NOR_BLK_GAP_EVT			(1 << 2)
++#define MVSD_NOR_DMA_DONE			(1 << 3)
++#define MVSD_NOR_TX_AVAIL			(1 << 4)
++#define MVSD_NOR_RX_READY			(1 << 5)
++#define MVSD_NOR_CARD_INT			(1 << 8)
++#define MVSD_NOR_READ_WAIT_ON			(1 << 9)
++#define MVSD_NOR_RX_FIFO_8W			(1 << 10)
++#define MVSD_NOR_TX_FIFO_8W			(1 << 11)
++#define MVSD_NOR_SUSPEND_ON			(1 << 12)
++#define MVSD_NOR_AUTOCMD12_DONE			(1 << 13)
++#define MVSD_NOR_UNEXP_RSP			(1 << 14)
++#define MVSD_NOR_ERROR				(1 << 15)
++
++
++/*
++ * Error status bits
++ */
++
++#define MVSD_ERR_CMD_TIMEOUT			(1 << 0)
++#define MVSD_ERR_CMD_CRC			(1 << 1)
++#define MVSD_ERR_CMD_ENDBIT			(1 << 2)
++#define MVSD_ERR_CMD_INDEX			(1 << 3)
++#define MVSD_ERR_DATA_TIMEOUT			(1 << 4)
++#define MVSD_ERR_DATA_CRC			(1 << 5)
++#define MVSD_ERR_DATA_ENDBIT			(1 << 6)
++#define MVSD_ERR_AUTOCMD12			(1 << 8)
++#define MVSD_ERR_CMD_STARTBIT			(1 << 9)
++#define MVSD_ERR_XFER_SIZE			(1 << 10)
++#define MVSD_ERR_RESP_T_BIT			(1 << 11)
++#define MVSD_ERR_CRC_ENDBIT			(1 << 12)
++#define MVSD_ERR_CRC_STARTBIT			(1 << 13)
++#define MVSD_ERR_CRC_STATUS			(1 << 14)
++
++
++/*
++ * CMD12 error status bits
++ */
++
++#define MVSD_AUTOCMD12_ERR_NOTEXE		(1 << 0)
++#define MVSD_AUTOCMD12_ERR_TIMEOUT		(1 << 1)
++#define MVSD_AUTOCMD12_ERR_CRC			(1 << 2)
++#define MVSD_AUTOCMD12_ERR_ENDBIT		(1 << 3)
++#define MVSD_AUTOCMD12_ERR_INDEX		(1 << 4)
++#define MVSD_AUTOCMD12_ERR_RESP_T_BIT		(1 << 5)
++#define MVSD_AUTOCMD12_ERR_RESP_STARTBIT	(1 << 6)
++
++#endif
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/mxcmmc.c linux-2.6.29/drivers/mmc/host/mxcmmc.c
+--- linux-2.6.29.ref/drivers/mmc/host/mxcmmc.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/mxcmmc.c	2011-05-31 10:42:56.603953873 -0700
+@@ -42,7 +42,7 @@
+ #define HAS_DMA
+ #endif
+ 
+-#define DRIVER_NAME "imx-mmc"
++#define DRIVER_NAME "mxc-mmc"
+ 
+ #define MMC_REG_STR_STP_CLK		0x00
+ #define MMC_REG_STATUS			0x04
+@@ -140,6 +140,8 @@
+ 	struct work_struct	datawork;
+ };
+ 
++static void mxcmci_set_clk_rate(struct mxcmci_host *host, unsigned int clk_ios);
++
+ static inline int mxcmci_use_dma(struct mxcmci_host *host)
+ {
+ 	return host->do_dma;
+@@ -160,7 +162,7 @@
+ 	writew(0xff, host->base + MMC_REG_RES_TO);
+ }
+ 
+-static void mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
++static int mxcmci_setup_data(struct mxcmci_host *host, struct mmc_data *data)
+ {
+ 	unsigned int nob = data->blocks;
+ 	unsigned int blksz = data->blksz;
+@@ -168,6 +170,7 @@
+ #ifdef HAS_DMA
+ 	struct scatterlist *sg;
+ 	int i;
++	int ret;
+ #endif
+ 	if (data->flags & MMC_DATA_STREAM)
+ 		nob = 0xffff;
+@@ -183,7 +186,7 @@
+ 	for_each_sg(data->sg, sg, data->sg_len, i) {
+ 		if (sg->offset & 3 || sg->length & 3) {
+ 			host->do_dma = 0;
+-			return;
++			return 0;
+ 		}
+ 	}
+ 
+@@ -192,23 +195,30 @@
+ 		host->dma_nents = dma_map_sg(mmc_dev(host->mmc), data->sg,
+ 					     data->sg_len,  host->dma_dir);
+ 
+-		imx_dma_setup_sg(host->dma, data->sg, host->dma_nents, datasize,
+-				 host->res->start + MMC_REG_BUFFER_ACCESS,
+-				 DMA_MODE_READ);
++		ret = imx_dma_setup_sg(host->dma, data->sg, host->dma_nents,
++				datasize,
++				host->res->start + MMC_REG_BUFFER_ACCESS,
++				DMA_MODE_READ);
+ 	} else {
+ 		host->dma_dir = DMA_TO_DEVICE;
+ 		host->dma_nents = dma_map_sg(mmc_dev(host->mmc), data->sg,
+ 					     data->sg_len,  host->dma_dir);
+ 
+-		imx_dma_setup_sg(host->dma, data->sg, host->dma_nents, datasize,
+-				 host->res->start + MMC_REG_BUFFER_ACCESS,
+-				 DMA_MODE_WRITE);
++		ret = imx_dma_setup_sg(host->dma, data->sg, host->dma_nents,
++				datasize,
++				host->res->start + MMC_REG_BUFFER_ACCESS,
++				DMA_MODE_WRITE);
+ 	}
+ 
++	if (ret) {
++		dev_err(mmc_dev(host->mmc), "failed to setup DMA : %d\n", ret);
++		return ret;
++	}
+ 	wmb();
+ 
+ 	imx_dma_enable(host->dma);
+ #endif /* HAS_DMA */
++	return 0;
+ }
+ 
+ static int mxcmci_start_cmd(struct mxcmci_host *host, struct mmc_command *cmd,
+@@ -345,8 +355,11 @@
+ 		stat = readl(host->base + MMC_REG_STATUS);
+ 		if (stat & STATUS_ERR_MASK)
+ 			return stat;
+-		if (time_after(jiffies, timeout))
++		if (time_after(jiffies, timeout)) {
++			mxcmci_softreset(host);
++			mxcmci_set_clk_rate(host, host->clock);
+ 			return STATUS_TIME_OUT_READ;
++		}
+ 		if (stat & mask)
+ 			return 0;
+ 		cpu_relax();
+@@ -531,6 +544,7 @@
+ {
+ 	struct mxcmci_host *host = mmc_priv(mmc);
+ 	unsigned int cmdat = host->cmdat;
++	int error;
+ 
+ 	WARN_ON(host->req != NULL);
+ 
+@@ -540,7 +554,12 @@
+ 	host->do_dma = 1;
+ #endif
+ 	if (req->data) {
+-		mxcmci_setup_data(host, req->data);
++		error = mxcmci_setup_data(host, req->data);
++		if (error) {
++			req->cmd->error = error;
++			goto out;
++		}
++
+ 
+ 		cmdat |= CMD_DAT_CONT_DATA_ENABLE;
+ 
+@@ -548,7 +567,9 @@
+ 			cmdat |= CMD_DAT_CONT_WRITE;
+ 	}
+ 
+-	if (mxcmci_start_cmd(host, req->cmd, cmdat))
++	error = mxcmci_start_cmd(host, req->cmd, cmdat);
++out:
++	if (error)
+ 		mxcmci_finish_request(host, req);
+ }
+ 
+@@ -707,7 +728,7 @@
+ 	host->res = r;
+ 	host->irq = irq;
+ 
+-	host->clk = clk_get(&pdev->dev, "sdhc_clk");
++	host->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(host->clk)) {
+ 		ret = PTR_ERR(host->clk);
+ 		goto out_iounmap;
+@@ -724,7 +745,9 @@
+ 		goto out_clk_put;
+ 	}
+ 
+-	mmc->f_min = clk_get_rate(host->clk) >> 7;
++	mmc->f_min = clk_get_rate(host->clk) >> 16;
++	if (mmc->f_min < 400000)
++		mmc->f_min = 400000;
+ 	mmc->f_max = clk_get_rate(host->clk) >> 1;
+ 
+ 	/* recommended in data sheet */
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/of_mmc_spi.c linux-2.6.29/drivers/mmc/host/of_mmc_spi.c
+--- linux-2.6.29.ref/drivers/mmc/host/of_mmc_spi.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/of_mmc_spi.c	2011-05-31 10:42:56.603953873 -0700
+@@ -103,7 +103,7 @@
+ 		if (!gpio_is_valid(oms->gpios[i]))
+ 			continue;
+ 
+-		ret = gpio_request(oms->gpios[i], dev->bus_id);
++		ret = gpio_request(oms->gpios[i], dev_name(dev));
+ 		if (ret < 0) {
+ 			oms->gpios[i] = -EINVAL;
+ 			continue;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/omap.c linux-2.6.29/drivers/mmc/host/omap.c
+--- linux-2.6.29.ref/drivers/mmc/host/omap.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/omap.c	2011-05-31 10:42:56.603953873 -0700
+@@ -157,8 +157,6 @@
+ 	struct timer_list	dma_timer;
+ 	unsigned		dma_len;
+ 
+-	short			power_pin;
+-
+ 	struct mmc_omap_slot    *slots[OMAP_MMC_MAX_SLOTS];
+ 	struct mmc_omap_slot    *current_slot;
+ 	spinlock_t              slot_lock;
+@@ -824,7 +822,7 @@
+ 		del_timer(&host->cmd_abort_timer);
+ 		host->abort = 1;
+ 		OMAP_MMC_WRITE(host, IE, 0);
+-		disable_irq(host->irq);
++		disable_irq_nosync(host->irq);
+ 		schedule_work(&host->cmd_abort_work);
+ 		return IRQ_HANDLED;
+ 	}
+@@ -1460,18 +1458,12 @@
+ 	if (!host->virt_base)
+ 		goto err_ioremap;
+ 
+-	if (cpu_is_omap24xx()) {
+-		host->iclk = clk_get(&pdev->dev, "mmc_ick");
+-		if (IS_ERR(host->iclk))
+-			goto err_free_mmc_host;
+-		clk_enable(host->iclk);
+-	}
+-
+-	if (!cpu_is_omap24xx())
+-		host->fclk = clk_get(&pdev->dev, "mmc_ck");
+-	else
+-		host->fclk = clk_get(&pdev->dev, "mmc_fck");
++	host->iclk = clk_get(&pdev->dev, "ick");
++	if (IS_ERR(host->iclk))
++		goto err_free_mmc_host;
++	clk_enable(host->iclk);
+ 
++	host->fclk = clk_get(&pdev->dev, "fck");
+ 	if (IS_ERR(host->fclk)) {
+ 		ret = PTR_ERR(host->fclk);
+ 		goto err_free_iclk;
+@@ -1536,10 +1528,10 @@
+ 	if (host->pdata->cleanup)
+ 		host->pdata->cleanup(&pdev->dev);
+ 
+-	if (host->iclk && !IS_ERR(host->iclk))
+-		clk_put(host->iclk);
+-	if (host->fclk && !IS_ERR(host->fclk))
+-		clk_put(host->fclk);
++	mmc_omap_fclk_enable(host, 0);
++	clk_put(host->fclk);
++	clk_disable(host->iclk);
++	clk_put(host->iclk);
+ 
+ 	iounmap(host->virt_base);
+ 	release_mem_region(pdev->resource[0].start,
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/omap_hsmmc.c linux-2.6.29/drivers/mmc/host/omap_hsmmc.c
+--- linux-2.6.29.ref/drivers/mmc/host/omap_hsmmc.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/omap_hsmmc.c	2011-05-31 10:42:56.603953873 -0700
+@@ -56,6 +56,7 @@
+ #define SDVS18			(0x5 << 9)
+ #define SDVS30			(0x6 << 9)
+ #define SDVS33			(0x7 << 9)
++#define SDVS_MASK		0x00000E00
+ #define SDVSCLR			0xFFFFF1FF
+ #define SDVSDET			0x00000400
+ #define AUTOIDLE		0x1
+@@ -76,6 +77,7 @@
+ #define MSBS			(1 << 5)
+ #define BCE			(1 << 1)
+ #define FOUR_BIT		(1 << 1)
++#define DW8			(1 << 5)
+ #define CC			0x1
+ #define TC			0x02
+ #define OD			0x1
+@@ -98,10 +100,8 @@
+  */
+ #define OMAP_MMC1_DEVID		0
+ #define OMAP_MMC2_DEVID		1
++#define OMAP_MMC3_DEVID		2
+ 
+-#define OMAP_MMC_DATADIR_NONE	0
+-#define OMAP_MMC_DATADIR_READ	1
+-#define OMAP_MMC_DATADIR_WRITE	2
+ #define MMC_TIMEOUT_MS		20
+ #define OMAP_MMC_MASTER_CLOCK	96000000
+ #define DRIVER_NAME		"mmci-omap-hs"
+@@ -137,18 +137,18 @@
+ 	resource_size_t		mapbase;
+ 	unsigned int		id;
+ 	unsigned int		dma_len;
+-	unsigned int		dma_dir;
++	unsigned int		dma_sg_idx;
+ 	unsigned char		bus_mode;
+-	unsigned char		datadir;
+ 	u32			*buffer;
+ 	u32			bytesleft;
+ 	int			suspended;
+ 	int			irq;
+ 	int			carddetect;
+ 	int			use_dma, dma_ch;
+-	int			initstr;
++	int			dma_line_tx, dma_line_rx;
+ 	int			slot_id;
+ 	int			dbclk_enabled;
++	int			response_busy;
+ 	struct	omap_mmc_platform_data	*pdata;
+ };
+ 
+@@ -218,7 +218,7 @@
+ 	struct mmc_omap_host *host = mmc_priv(mmc);
+ 	struct omap_mmc_slot_data slot = host->pdata->slots[host->slot_id];
+ 
+-	return sprintf(buf, "slot:%s\n", slot.name);
++	return sprintf(buf, "%s\n", slot.name);
+ }
+ 
+ static DEVICE_ATTR(slot_name, S_IRUGO, mmc_omap_show_slot_name, NULL);
+@@ -243,10 +243,14 @@
+ 	OMAP_HSMMC_WRITE(host->base, ISE, INT_EN_MASK);
+ 	OMAP_HSMMC_WRITE(host->base, IE, INT_EN_MASK);
+ 
++	host->response_busy = 0;
+ 	if (cmd->flags & MMC_RSP_PRESENT) {
+ 		if (cmd->flags & MMC_RSP_136)
+ 			resptype = 1;
+-		else
++		else if (cmd->flags & MMC_RSP_BUSY) {
++			resptype = 3;
++			host->response_busy = 1;
++		} else
+ 			resptype = 2;
+ 	}
+ 
+@@ -275,19 +279,34 @@
+ 	OMAP_HSMMC_WRITE(host->base, CMD, cmdreg);
+ }
+ 
++static int
++mmc_omap_get_dma_dir(struct mmc_omap_host *host, struct mmc_data *data)
++{
++	if (data->flags & MMC_DATA_WRITE)
++		return DMA_TO_DEVICE;
++	else
++		return DMA_FROM_DEVICE;
++}
++
+ /*
+  * Notify the transfer complete to MMC core
+  */
+ static void
+ mmc_omap_xfer_done(struct mmc_omap_host *host, struct mmc_data *data)
+ {
++	if (!data) {
++		struct mmc_request *mrq = host->mrq;
++
++		host->mrq = NULL;
++		mmc_request_done(host->mmc, mrq);
++		return;
++	}
++
+ 	host->data = NULL;
+ 
+ 	if (host->use_dma && host->dma_ch != -1)
+ 		dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
+-			host->dma_dir);
+-
+-	host->datadir = OMAP_MMC_DATADIR_NONE;
++			mmc_omap_get_dma_dir(host, data));
+ 
+ 	if (!data->error)
+ 		data->bytes_xfered += data->blocks * (data->blksz);
+@@ -322,7 +341,7 @@
+ 			cmd->resp[0] = OMAP_HSMMC_READ(host->base, RSP10);
+ 		}
+ 	}
+-	if (host->data == NULL || cmd->error) {
++	if ((host->data == NULL && !host->response_busy) || cmd->error) {
+ 		host->mrq = NULL;
+ 		mmc_request_done(host->mmc, cmd->mrq);
+ 	}
+@@ -331,19 +350,18 @@
+ /*
+  * DMA clean up for command errors
+  */
+-static void mmc_dma_cleanup(struct mmc_omap_host *host)
++static void mmc_dma_cleanup(struct mmc_omap_host *host, int errno)
+ {
+-	host->data->error = -ETIMEDOUT;
++	host->data->error = errno;
+ 
+ 	if (host->use_dma && host->dma_ch != -1) {
+ 		dma_unmap_sg(mmc_dev(host->mmc), host->data->sg, host->dma_len,
+-			host->dma_dir);
++			mmc_omap_get_dma_dir(host, host->data));
+ 		omap_free_dma(host->dma_ch);
+ 		host->dma_ch = -1;
+ 		up(&host->sem);
+ 	}
+ 	host->data = NULL;
+-	host->datadir = OMAP_MMC_DATADIR_NONE;
+ }
+ 
+ /*
+@@ -412,9 +430,11 @@
+ 	struct mmc_data *data;
+ 	int end_cmd = 0, end_trans = 0, status;
+ 
+-	if (host->cmd == NULL && host->data == NULL) {
++	if (host->mrq == NULL) {
+ 		OMAP_HSMMC_WRITE(host->base, STAT,
+ 			OMAP_HSMMC_READ(host->base, STAT));
++		/* Flush posted write */
++		OMAP_HSMMC_READ(host->base, STAT);
+ 		return IRQ_HANDLED;
+ 	}
+ 
+@@ -437,18 +457,24 @@
+ 				}
+ 				end_cmd = 1;
+ 			}
+-			if (host->data) {
+-				mmc_dma_cleanup(host);
++			if (host->data || host->response_busy) {
++				if (host->data)
++					mmc_dma_cleanup(host, -ETIMEDOUT);
++				host->response_busy = 0;
+ 				mmc_omap_reset_controller_fsm(host, SRD);
+ 			}
+ 		}
+ 		if ((status & DATA_TIMEOUT) ||
+ 			(status & DATA_CRC)) {
+-			if (host->data) {
+-				if (status & DATA_TIMEOUT)
+-					mmc_dma_cleanup(host);
++			if (host->data || host->response_busy) {
++				int err = (status & DATA_TIMEOUT) ?
++						-ETIMEDOUT : -EILSEQ;
++
++				if (host->data)
++					mmc_dma_cleanup(host, err);
+ 				else
+-					host->data->error = -EILSEQ;
++					host->mrq->cmd->error = err;
++				host->response_busy = 0;
+ 				mmc_omap_reset_controller_fsm(host, SRD);
+ 				end_trans = 1;
+ 			}
+@@ -464,8 +490,10 @@
+ 	}
+ 
+ 	OMAP_HSMMC_WRITE(host->base, STAT, status);
++	/* Flush posted write */
++	OMAP_HSMMC_READ(host->base, STAT);
+ 
+-	if (end_cmd || (status & CC))
++	if (end_cmd || ((status & CC) && host->cmd))
+ 		mmc_omap_cmd_done(host, host->cmd);
+ 	if (end_trans || (status & TC))
+ 		mmc_omap_xfer_done(host, data);
+@@ -473,6 +501,19 @@
+ 	return IRQ_HANDLED;
+ }
+ 
++static void set_sd_bus_power(struct mmc_omap_host *host)
++{
++	unsigned long i;
++
++	OMAP_HSMMC_WRITE(host->base, HCTL,
++			 OMAP_HSMMC_READ(host->base, HCTL) | SDBP);
++	for (i = 0; i < loops_per_jiffy; i++) {
++		if (OMAP_HSMMC_READ(host->base, HCTL) & SDBP)
++			break;
++		cpu_relax();
++	}
++}
++
+ /*
+  * Switch MMC interface voltage ... only relevant for MMC1.
+  *
+@@ -485,9 +526,6 @@
+ 	u32 reg_val = 0;
+ 	int ret;
+ 
+-	if (host->id != OMAP_MMC1_DEVID)
+-		return 0;
+-
+ 	/* Disable the clocks */
+ 	clk_disable(host->fclk);
+ 	clk_disable(host->iclk);
+@@ -532,9 +570,7 @@
+ 		reg_val |= SDVS30;
+ 
+ 	OMAP_HSMMC_WRITE(host->base, HCTL, reg_val);
+-
+-	OMAP_HSMMC_WRITE(host->base, HCTL,
+-		OMAP_HSMMC_READ(host->base, HCTL) | SDBP);
++	set_sd_bus_power(host);
+ 
+ 	return 0;
+ err:
+@@ -551,7 +587,10 @@
+ 						mmc_carddetect_work);
+ 	struct omap_mmc_slot_data *slot = &mmc_slot(host);
+ 
+-	host->carddetect = slot->card_detect(slot->card_detect_irq);
++	if (mmc_slot(host).card_detect)
++		host->carddetect = slot->card_detect(slot->card_detect_irq);
++	else
++		host->carddetect = -ENOSYS;
+ 
+ 	sysfs_notify(&host->mmc->class_dev.kobj, NULL, "cover_switch");
+ 	if (host->carddetect) {
+@@ -574,6 +613,48 @@
+ 	return IRQ_HANDLED;
+ }
+ 
++static int mmc_omap_get_dma_sync_dev(struct mmc_omap_host *host,
++				     struct mmc_data *data)
++{
++	int sync_dev;
++
++	if (data->flags & MMC_DATA_WRITE)
++		sync_dev = host->dma_line_tx;
++	else
++		sync_dev = host->dma_line_rx;
++	return sync_dev;
++}
++
++static void mmc_omap_config_dma_params(struct mmc_omap_host *host,
++				       struct mmc_data *data,
++				       struct scatterlist *sgl)
++{
++	int blksz, nblk, dma_ch;
++
++	dma_ch = host->dma_ch;
++	if (data->flags & MMC_DATA_WRITE) {
++		omap_set_dma_dest_params(dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
++			(host->mapbase + OMAP_HSMMC_DATA), 0, 0);
++		omap_set_dma_src_params(dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
++			sg_dma_address(sgl), 0, 0);
++	} else {
++		omap_set_dma_src_params(dma_ch, 0, OMAP_DMA_AMODE_CONSTANT,
++					(host->mapbase + OMAP_HSMMC_DATA), 0, 0);
++		omap_set_dma_dest_params(dma_ch, 0, OMAP_DMA_AMODE_POST_INC,
++			sg_dma_address(sgl), 0, 0);
++	}
++
++	blksz = host->data->blksz;
++	nblk = sg_dma_len(sgl) / blksz;
++
++	omap_set_dma_transfer_params(dma_ch, OMAP_DMA_DATA_TYPE_S32,
++			blksz / 4, nblk, OMAP_DMA_SYNC_FRAME,
++			mmc_omap_get_dma_sync_dev(host, data),
++			!(data->flags & MMC_DATA_WRITE));
++
++	omap_start_dma(dma_ch);
++}
++
+ /*
+  * DMA call back function
+  */
+@@ -587,48 +668,46 @@
+ 	if (host->dma_ch < 0)
+ 		return;
+ 
++	host->dma_sg_idx++;
++	if (host->dma_sg_idx < host->dma_len) {
++		/* Fire up the next transfer. */
++		mmc_omap_config_dma_params(host, host->data,
++					   host->data->sg + host->dma_sg_idx);
++		return;
++	}
++
+ 	omap_free_dma(host->dma_ch);
+ 	host->dma_ch = -1;
+ 	/*
+ 	 * DMA Callback: run in interrupt context.
+-	 * mutex_unlock will through a kernel warning if used.
++	 * mutex_unlock will throw a kernel warning if used.
+ 	 */
+ 	up(&host->sem);
+ }
+ 
+ /*
+- * Configure dma src and destination parameters
+- */
+-static int mmc_omap_config_dma_param(int sync_dir, struct mmc_omap_host *host,
+-				struct mmc_data *data)
+-{
+-	if (sync_dir == 0) {
+-		omap_set_dma_dest_params(host->dma_ch, 0,
+-			OMAP_DMA_AMODE_CONSTANT,
+-			(host->mapbase + OMAP_HSMMC_DATA), 0, 0);
+-		omap_set_dma_src_params(host->dma_ch, 0,
+-			OMAP_DMA_AMODE_POST_INC,
+-			sg_dma_address(&data->sg[0]), 0, 0);
+-	} else {
+-		omap_set_dma_src_params(host->dma_ch, 0,
+-			OMAP_DMA_AMODE_CONSTANT,
+-			(host->mapbase + OMAP_HSMMC_DATA), 0, 0);
+-		omap_set_dma_dest_params(host->dma_ch, 0,
+-			OMAP_DMA_AMODE_POST_INC,
+-			sg_dma_address(&data->sg[0]), 0, 0);
+-	}
+-	return 0;
+-}
+-/*
+  * Routine to configure and start DMA for the MMC card
+  */
+ static int
+ mmc_omap_start_dma_transfer(struct mmc_omap_host *host, struct mmc_request *req)
+ {
+-	int sync_dev, sync_dir = 0;
+-	int dma_ch = 0, ret = 0, err = 1;
++	int dma_ch = 0, ret = 0, err = 1, i;
+ 	struct mmc_data *data = req->data;
+ 
++	/* Sanity check: all the SG entries must be aligned by block size. */
++	for (i = 0; i < host->dma_len; i++) {
++		struct scatterlist *sgl;
++
++		sgl = data->sg + i;
++		if (sgl->length % data->blksz)
++			return -EINVAL;
++	}
++	if ((data->blksz % 4) != 0)
++		/* REVISIT: The MMC buffer increments only when MSB is written.
++		 * Return error for blksz which is non multiple of four.
++		 */
++		return -EINVAL;
++
+ 	/*
+ 	 * If for some reason the DMA transfer is still active,
+ 	 * we wait for timeout period and free the dma
+@@ -647,49 +726,22 @@
+ 			return err;
+ 	}
+ 
+-	if (!(data->flags & MMC_DATA_WRITE)) {
+-		host->dma_dir = DMA_FROM_DEVICE;
+-		if (host->id == OMAP_MMC1_DEVID)
+-			sync_dev = OMAP24XX_DMA_MMC1_RX;
+-		else
+-			sync_dev = OMAP24XX_DMA_MMC2_RX;
+-	} else {
+-		host->dma_dir = DMA_TO_DEVICE;
+-		if (host->id == OMAP_MMC1_DEVID)
+-			sync_dev = OMAP24XX_DMA_MMC1_TX;
+-		else
+-			sync_dev = OMAP24XX_DMA_MMC2_TX;
+-	}
+-
+-	ret = omap_request_dma(sync_dev, "MMC/SD", mmc_omap_dma_cb,
+-			host, &dma_ch);
++	ret = omap_request_dma(mmc_omap_get_dma_sync_dev(host, data), "MMC/SD",
++			       mmc_omap_dma_cb,host, &dma_ch);
+ 	if (ret != 0) {
+-		dev_dbg(mmc_dev(host->mmc),
++		dev_err(mmc_dev(host->mmc),
+ 			"%s: omap_request_dma() failed with %d\n",
+ 			mmc_hostname(host->mmc), ret);
+ 		return ret;
+ 	}
+ 
+ 	host->dma_len = dma_map_sg(mmc_dev(host->mmc), data->sg,
+-			data->sg_len, host->dma_dir);
++			data->sg_len, mmc_omap_get_dma_dir(host, data));
+ 	host->dma_ch = dma_ch;
++	host->dma_sg_idx = 0;
+ 
+-	if (!(data->flags & MMC_DATA_WRITE))
+-		mmc_omap_config_dma_param(1, host, data);
+-	else
+-		mmc_omap_config_dma_param(0, host, data);
++	mmc_omap_config_dma_params(host, data, data->sg);
+ 
+-	if ((data->blksz % 4) == 0)
+-		omap_set_dma_transfer_params(dma_ch, OMAP_DMA_DATA_TYPE_S32,
+-			(data->blksz / 4), data->blocks, OMAP_DMA_SYNC_FRAME,
+-			sync_dev, sync_dir);
+-	else
+-		/* REVISIT: The MMC buffer increments only when MSB is written.
+-		 * Return error for blksz which is non multiple of four.
+-		 */
+-		return -EINVAL;
+-
+-	omap_start_dma(dma_ch);
+ 	return 0;
+ }
+ 
+@@ -739,7 +791,6 @@
+ 	host->data = req->data;
+ 
+ 	if (req->data == NULL) {
+-		host->datadir = OMAP_MMC_DATADIR_NONE;
+ 		OMAP_HSMMC_WRITE(host->base, BLK, 0);
+ 		return 0;
+ 	}
+@@ -748,9 +799,6 @@
+ 					| (req->data->blocks << 16));
+ 	set_data_timeout(host, req);
+ 
+-	host->datadir = (req->data->flags & MMC_DATA_WRITE) ?
+-			OMAP_MMC_DATADIR_WRITE : OMAP_MMC_DATADIR_READ;
+-
+ 	if (host->use_dma) {
+ 		ret = mmc_omap_start_dma_transfer(host, req);
+ 		if (ret != 0) {
+@@ -782,36 +830,29 @@
+ 	u16 dsor = 0;
+ 	unsigned long regval;
+ 	unsigned long timeout;
++	u32 con;
+ 
+ 	switch (ios->power_mode) {
+ 	case MMC_POWER_OFF:
+ 		mmc_slot(host).set_power(host->dev, host->slot_id, 0, 0);
+-		/*
+-		 * Reset interface voltage to 3V if it's 1.8V now;
+-		 * only relevant on MMC-1, the others always use 1.8V.
+-		 *
+-		 * REVISIT: If we are able to detect cards after unplugging
+-		 * a 1.8V card, this code should not be needed.
+-		 */
+-		if (host->id != OMAP_MMC1_DEVID)
+-			break;
+-		if (!(OMAP_HSMMC_READ(host->base, HCTL) & SDVSDET)) {
+-			int vdd = fls(host->mmc->ocr_avail) - 1;
+-			if (omap_mmc_switch_opcond(host, vdd) != 0)
+-				host->mmc->ios.vdd = vdd;
+-		}
+ 		break;
+ 	case MMC_POWER_UP:
+ 		mmc_slot(host).set_power(host->dev, host->slot_id, 1, ios->vdd);
+ 		break;
+ 	}
+ 
++	con = OMAP_HSMMC_READ(host->base, CON);
+ 	switch (mmc->ios.bus_width) {
++	case MMC_BUS_WIDTH_8:
++		OMAP_HSMMC_WRITE(host->base, CON, con | DW8);
++		break;
+ 	case MMC_BUS_WIDTH_4:
++		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
+ 		OMAP_HSMMC_WRITE(host->base, HCTL,
+ 			OMAP_HSMMC_READ(host->base, HCTL) | FOUR_BIT);
+ 		break;
+ 	case MMC_BUS_WIDTH_1:
++		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
+ 		OMAP_HSMMC_WRITE(host->base, HCTL,
+ 			OMAP_HSMMC_READ(host->base, HCTL) & ~FOUR_BIT);
+ 		break;
+@@ -891,6 +932,33 @@
+ 	return pdata->slots[0].get_ro(host->dev, 0);
+ }
+ 
++static void omap_hsmmc_init(struct mmc_omap_host *host)
++{
++	u32 hctl, capa, value;
++
++	/* Only MMC1 supports 3.0V */
++	if (host->id == OMAP_MMC1_DEVID) {
++		hctl = SDVS30;
++		capa = VS30 | VS18;
++	} else {
++		hctl = SDVS18;
++		capa = VS18;
++	}
++
++	value = OMAP_HSMMC_READ(host->base, HCTL) & ~SDVS_MASK;
++	OMAP_HSMMC_WRITE(host->base, HCTL, value | hctl);
++
++	value = OMAP_HSMMC_READ(host->base, CAPA);
++	OMAP_HSMMC_WRITE(host->base, CAPA, value | capa);
++
++	/* Set the controller to AUTO IDLE mode */
++	value = OMAP_HSMMC_READ(host->base, SYSCONFIG);
++	OMAP_HSMMC_WRITE(host->base, SYSCONFIG, value | AUTOIDLE);
++
++	/* Set SD bus power bit */
++	set_sd_bus_power(host);
++}
++
+ static struct mmc_host_ops mmc_omap_ops = {
+ 	.request = omap_mmc_request,
+ 	.set_ios = omap_mmc_set_ios,
+@@ -906,7 +974,6 @@
+ 	struct mmc_omap_host *host = NULL;
+ 	struct resource *res;
+ 	int ret = 0, irq;
+-	u32 hctl, capa;
+ 
+ 	if (pdata == NULL) {
+ 		dev_err(&pdev->dev, "Platform Data is missing\n");
+@@ -956,13 +1023,13 @@
+ 
+ 	sema_init(&host->sem, 1);
+ 
+-	host->iclk = clk_get(&pdev->dev, "mmchs_ick");
++	host->iclk = clk_get(&pdev->dev, "ick");
+ 	if (IS_ERR(host->iclk)) {
+ 		ret = PTR_ERR(host->iclk);
+ 		host->iclk = NULL;
+ 		goto err1;
+ 	}
+-	host->fclk = clk_get(&pdev->dev, "mmchs_fck");
++	host->fclk = clk_get(&pdev->dev, "fck");
+ 	if (IS_ERR(host->fclk)) {
+ 		ret = PTR_ERR(host->fclk);
+ 		host->fclk = NULL;
+@@ -996,10 +1063,11 @@
+ 		else
+ 			host->dbclk_enabled = 1;
+ 
+-#ifdef CONFIG_MMC_BLOCK_BOUNCE
+-	mmc->max_phys_segs = 1;
+-	mmc->max_hw_segs = 1;
+-#endif
++	/* Since we do only SG emulation, we can have as many segs
++	 * as we want. */
++	mmc->max_phys_segs = 1024;
++	mmc->max_hw_segs = 1024;
++
+ 	mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
+ 	mmc->max_blk_count = 0xFFFF;    /* No. of Blocks is 16 bits */
+ 	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
+@@ -1008,31 +1076,31 @@
+ 	mmc->ocr_avail = mmc_slot(host).ocr_mask;
+ 	mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED;
+ 
+-	if (pdata->slots[host->slot_id].wires >= 4)
++	if (pdata->slots[host->slot_id].wires >= 8)
++		mmc->caps |= MMC_CAP_8_BIT_DATA;
++	else if (pdata->slots[host->slot_id].wires >= 4)
+ 		mmc->caps |= MMC_CAP_4_BIT_DATA;
+ 
+-	/* Only MMC1 supports 3.0V */
+-	if (host->id == OMAP_MMC1_DEVID) {
+-		hctl = SDVS30;
+-		capa = VS30 | VS18;
+-	} else {
+-		hctl = SDVS18;
+-		capa = VS18;
+-	}
+-
+-	OMAP_HSMMC_WRITE(host->base, HCTL,
+-			OMAP_HSMMC_READ(host->base, HCTL) | hctl);
+-
+-	OMAP_HSMMC_WRITE(host->base, CAPA,
+-			OMAP_HSMMC_READ(host->base, CAPA) | capa);
+-
+-	/* Set the controller to AUTO IDLE mode */
+-	OMAP_HSMMC_WRITE(host->base, SYSCONFIG,
+-			OMAP_HSMMC_READ(host->base, SYSCONFIG) | AUTOIDLE);
++	omap_hsmmc_init(host);
+ 
+-	/* Set SD bus power bit */
+-	OMAP_HSMMC_WRITE(host->base, HCTL,
+-			OMAP_HSMMC_READ(host->base, HCTL) | SDBP);
++	/* Select DMA lines */
++	switch (host->id) {
++	case OMAP_MMC1_DEVID:
++		host->dma_line_tx = OMAP24XX_DMA_MMC1_TX;
++		host->dma_line_rx = OMAP24XX_DMA_MMC1_RX;
++		break;
++	case OMAP_MMC2_DEVID:
++		host->dma_line_tx = OMAP24XX_DMA_MMC2_TX;
++		host->dma_line_rx = OMAP24XX_DMA_MMC2_RX;
++		break;
++	case OMAP_MMC3_DEVID:
++		host->dma_line_tx = OMAP34XX_DMA_MMC3_TX;
++		host->dma_line_rx = OMAP34XX_DMA_MMC3_RX;
++		break;
++	default:
++		dev_err(mmc_dev(host->mmc), "Invalid MMC id\n");
++		goto err_irq;
++	}
+ 
+ 	/* Request IRQ for MMC operations */
+ 	ret = request_irq(host->irq, mmc_omap_irq, IRQF_DISABLED,
+@@ -1051,7 +1119,7 @@
+ 	}
+ 
+ 	/* Request IRQ for card detect */
+-	if ((mmc_slot(host).card_detect_irq) && (mmc_slot(host).card_detect)) {
++	if ((mmc_slot(host).card_detect_irq)) {
+ 		ret = request_irq(mmc_slot(host).card_detect_irq,
+ 				  omap_mmc_cd_handler,
+ 				  IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING
+@@ -1074,8 +1142,8 @@
+ 		if (ret < 0)
+ 			goto err_slot_name;
+ 	}
+-	if (mmc_slot(host).card_detect_irq && mmc_slot(host).card_detect &&
+-			host->pdata->slots[host->slot_id].get_cover_state) {
++	if (mmc_slot(host).card_detect_irq &&
++	    host->pdata->slots[host->slot_id].get_cover_state) {
+ 		ret = device_create_file(&mmc->class_dev,
+ 					&dev_attr_cover_switch);
+ 		if (ret < 0)
+@@ -1173,20 +1241,8 @@
+ 						" level suspend\n");
+ 			}
+ 
+-			if (host->id == OMAP_MMC1_DEVID
+-					&& !(OMAP_HSMMC_READ(host->base, HCTL)
+-							& SDVSDET)) {
+-				OMAP_HSMMC_WRITE(host->base, HCTL,
+-					OMAP_HSMMC_READ(host->base, HCTL)
+-					& SDVSCLR);
+-				OMAP_HSMMC_WRITE(host->base, HCTL,
+-					OMAP_HSMMC_READ(host->base, HCTL)
+-					| SDVS30);
+-				OMAP_HSMMC_WRITE(host->base, HCTL,
+-					OMAP_HSMMC_READ(host->base, HCTL)
+-					| SDBP);
+-			}
+-
++			OMAP_HSMMC_WRITE(host->base, HCTL,
++					 OMAP_HSMMC_READ(host->base, HCTL) & ~SDBP);
+ 			clk_disable(host->fclk);
+ 			clk_disable(host->iclk);
+ 			clk_disable(host->dbclk);
+@@ -1222,6 +1278,8 @@
+ 			dev_dbg(mmc_dev(host->mmc),
+ 					"Enabling debounce clk failed\n");
+ 
++		omap_hsmmc_init(host);
++
+ 		if (host->pdata->resume) {
+ 			ret = host->pdata->resume(&pdev->dev, host->slot_id);
+ 			if (ret)
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/pxamci.c linux-2.6.29/drivers/mmc/host/pxamci.c
+--- linux-2.6.29.ref/drivers/mmc/host/pxamci.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/pxamci.c	2011-05-31 10:42:56.603953873 -0700
+@@ -30,9 +30,8 @@
+ 
+ #include <asm/sizes.h>
+ 
+-#include <mach/dma.h>
+ #include <mach/hardware.h>
+-#include <mach/pxa-regs.h>
++#include <mach/dma.h>
+ #include <mach/mmc.h>
+ 
+ #include "pxamci.h"
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/sdhci.c linux-2.6.29/drivers/mmc/host/sdhci.c
+--- linux-2.6.29.ref/drivers/mmc/host/sdhci.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/sdhci.c	2011-05-31 10:42:56.603953873 -0700
+@@ -48,35 +48,35 @@
+ 	printk(KERN_DEBUG DRIVER_NAME ": ============== REGISTER DUMP ==============\n");
+ 
+ 	printk(KERN_DEBUG DRIVER_NAME ": Sys addr: 0x%08x | Version:  0x%08x\n",
+-		readl(host->ioaddr + SDHCI_DMA_ADDRESS),
+-		readw(host->ioaddr + SDHCI_HOST_VERSION));
++		sdhci_readl(host, SDHCI_DMA_ADDRESS),
++		sdhci_readw(host, SDHCI_HOST_VERSION));
+ 	printk(KERN_DEBUG DRIVER_NAME ": Blk size: 0x%08x | Blk cnt:  0x%08x\n",
+-		readw(host->ioaddr + SDHCI_BLOCK_SIZE),
+-		readw(host->ioaddr + SDHCI_BLOCK_COUNT));
++		sdhci_readw(host, SDHCI_BLOCK_SIZE),
++		sdhci_readw(host, SDHCI_BLOCK_COUNT));
+ 	printk(KERN_DEBUG DRIVER_NAME ": Argument: 0x%08x | Trn mode: 0x%08x\n",
+-		readl(host->ioaddr + SDHCI_ARGUMENT),
+-		readw(host->ioaddr + SDHCI_TRANSFER_MODE));
++		sdhci_readl(host, SDHCI_ARGUMENT),
++		sdhci_readw(host, SDHCI_TRANSFER_MODE));
+ 	printk(KERN_DEBUG DRIVER_NAME ": Present:  0x%08x | Host ctl: 0x%08x\n",
+-		readl(host->ioaddr + SDHCI_PRESENT_STATE),
+-		readb(host->ioaddr + SDHCI_HOST_CONTROL));
++		sdhci_readl(host, SDHCI_PRESENT_STATE),
++		sdhci_readb(host, SDHCI_HOST_CONTROL));
+ 	printk(KERN_DEBUG DRIVER_NAME ": Power:    0x%08x | Blk gap:  0x%08x\n",
+-		readb(host->ioaddr + SDHCI_POWER_CONTROL),
+-		readb(host->ioaddr + SDHCI_BLOCK_GAP_CONTROL));
++		sdhci_readb(host, SDHCI_POWER_CONTROL),
++		sdhci_readb(host, SDHCI_BLOCK_GAP_CONTROL));
+ 	printk(KERN_DEBUG DRIVER_NAME ": Wake-up:  0x%08x | Clock:    0x%08x\n",
+-		readb(host->ioaddr + SDHCI_WAKE_UP_CONTROL),
+-		readw(host->ioaddr + SDHCI_CLOCK_CONTROL));
++		sdhci_readb(host, SDHCI_WAKE_UP_CONTROL),
++		sdhci_readw(host, SDHCI_CLOCK_CONTROL));
+ 	printk(KERN_DEBUG DRIVER_NAME ": Timeout:  0x%08x | Int stat: 0x%08x\n",
+-		readb(host->ioaddr + SDHCI_TIMEOUT_CONTROL),
+-		readl(host->ioaddr + SDHCI_INT_STATUS));
++		sdhci_readb(host, SDHCI_TIMEOUT_CONTROL),
++		sdhci_readl(host, SDHCI_INT_STATUS));
+ 	printk(KERN_DEBUG DRIVER_NAME ": Int enab: 0x%08x | Sig enab: 0x%08x\n",
+-		readl(host->ioaddr + SDHCI_INT_ENABLE),
+-		readl(host->ioaddr + SDHCI_SIGNAL_ENABLE));
++		sdhci_readl(host, SDHCI_INT_ENABLE),
++		sdhci_readl(host, SDHCI_SIGNAL_ENABLE));
+ 	printk(KERN_DEBUG DRIVER_NAME ": AC12 err: 0x%08x | Slot int: 0x%08x\n",
+-		readw(host->ioaddr + SDHCI_ACMD12_ERR),
+-		readw(host->ioaddr + SDHCI_SLOT_INT_STATUS));
++		sdhci_readw(host, SDHCI_ACMD12_ERR),
++		sdhci_readw(host, SDHCI_SLOT_INT_STATUS));
+ 	printk(KERN_DEBUG DRIVER_NAME ": Caps:     0x%08x | Max curr: 0x%08x\n",
+-		readl(host->ioaddr + SDHCI_CAPABILITIES),
+-		readl(host->ioaddr + SDHCI_MAX_CURRENT));
++		sdhci_readl(host, SDHCI_CAPABILITIES),
++		sdhci_readl(host, SDHCI_MAX_CURRENT));
+ 
+ 	printk(KERN_DEBUG DRIVER_NAME ": ===========================================\n");
+ }
+@@ -87,17 +87,65 @@
+  *                                                                           *
+ \*****************************************************************************/
+ 
++static void sdhci_clear_set_irqs(struct sdhci_host *host, u32 clear, u32 set)
++{
++	u32 ier;
++
++	ier = sdhci_readl(host, SDHCI_INT_ENABLE);
++	ier &= ~clear;
++	ier |= set;
++	sdhci_writel(host, ier, SDHCI_INT_ENABLE);
++	sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
++}
++
++static void sdhci_unmask_irqs(struct sdhci_host *host, u32 irqs)
++{
++	sdhci_clear_set_irqs(host, 0, irqs);
++}
++
++static void sdhci_mask_irqs(struct sdhci_host *host, u32 irqs)
++{
++	sdhci_clear_set_irqs(host, irqs, 0);
++}
++
++static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
++{
++	u32 irqs = SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT;
++
++	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
++		return;
++
++	if (enable)
++		sdhci_unmask_irqs(host, irqs);
++	else
++		sdhci_mask_irqs(host, irqs);
++}
++
++static void sdhci_enable_card_detection(struct sdhci_host *host)
++{
++	sdhci_set_card_detection(host, true);
++}
++
++static void sdhci_disable_card_detection(struct sdhci_host *host)
++{
++	sdhci_set_card_detection(host, false);
++}
++
+ static void sdhci_reset(struct sdhci_host *host, u8 mask)
+ {
+ 	unsigned long timeout;
++	u32 uninitialized_var(ier);
+ 
+ 	if (host->quirks & SDHCI_QUIRK_NO_CARD_NO_RESET) {
+-		if (!(readl(host->ioaddr + SDHCI_PRESENT_STATE) &
++		if (!(sdhci_readl(host, SDHCI_PRESENT_STATE) &
+ 			SDHCI_CARD_PRESENT))
+ 			return;
+ 	}
+ 
+-	writeb(mask, host->ioaddr + SDHCI_SOFTWARE_RESET);
++	if (host->quirks & SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
++		ier = sdhci_readl(host, SDHCI_INT_ENABLE);
++
++	sdhci_writeb(host, mask, SDHCI_SOFTWARE_RESET);
+ 
+ 	if (mask & SDHCI_RESET_ALL)
+ 		host->clock = 0;
+@@ -106,7 +154,7 @@
+ 	timeout = 100;
+ 
+ 	/* hw clears the bit when it's done */
+-	while (readb(host->ioaddr + SDHCI_SOFTWARE_RESET) & mask) {
++	while (sdhci_readb(host, SDHCI_SOFTWARE_RESET) & mask) {
+ 		if (timeout == 0) {
+ 			printk(KERN_ERR "%s: Reset 0x%x never completed.\n",
+ 				mmc_hostname(host->mmc), (int)mask);
+@@ -116,42 +164,44 @@
+ 		timeout--;
+ 		mdelay(1);
+ 	}
++
++	if (host->quirks & SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET)
++		sdhci_clear_set_irqs(host, SDHCI_INT_ALL_MASK, ier);
+ }
+ 
+ static void sdhci_init(struct sdhci_host *host)
+ {
+-	u32 intmask;
+-
+ 	sdhci_reset(host, SDHCI_RESET_ALL);
+ 
+-	intmask = SDHCI_INT_BUS_POWER | SDHCI_INT_DATA_END_BIT |
++	sdhci_clear_set_irqs(host, SDHCI_INT_ALL_MASK,
++		SDHCI_INT_BUS_POWER | SDHCI_INT_DATA_END_BIT |
+ 		SDHCI_INT_DATA_CRC | SDHCI_INT_DATA_TIMEOUT | SDHCI_INT_INDEX |
+ 		SDHCI_INT_END_BIT | SDHCI_INT_CRC | SDHCI_INT_TIMEOUT |
+-		SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT |
+-		SDHCI_INT_DATA_AVAIL | SDHCI_INT_SPACE_AVAIL |
+-		SDHCI_INT_DMA_END | SDHCI_INT_DATA_END | SDHCI_INT_RESPONSE |
+-		SDHCI_INT_ADMA_ERROR;
++		SDHCI_INT_DATA_END | SDHCI_INT_RESPONSE);
++}
+ 
+-	writel(intmask, host->ioaddr + SDHCI_INT_ENABLE);
+-	writel(intmask, host->ioaddr + SDHCI_SIGNAL_ENABLE);
++static void sdhci_reinit(struct sdhci_host *host)
++{
++	sdhci_init(host);
++	sdhci_enable_card_detection(host);
+ }
+ 
+ static void sdhci_activate_led(struct sdhci_host *host)
+ {
+ 	u8 ctrl;
+ 
+-	ctrl = readb(host->ioaddr + SDHCI_HOST_CONTROL);
++	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+ 	ctrl |= SDHCI_CTRL_LED;
+-	writeb(ctrl, host->ioaddr + SDHCI_HOST_CONTROL);
++	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+ }
+ 
+ static void sdhci_deactivate_led(struct sdhci_host *host)
+ {
+ 	u8 ctrl;
+ 
+-	ctrl = readb(host->ioaddr + SDHCI_HOST_CONTROL);
++	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+ 	ctrl &= ~SDHCI_CTRL_LED;
+-	writeb(ctrl, host->ioaddr + SDHCI_HOST_CONTROL);
++	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+ }
+ 
+ #ifdef SDHCI_USE_LEDS_CLASS
+@@ -205,7 +255,7 @@
+ 
+ 		while (len) {
+ 			if (chunk == 0) {
+-				scratch = readl(host->ioaddr + SDHCI_BUFFER);
++				scratch = sdhci_readl(host, SDHCI_BUFFER);
+ 				chunk = 4;
+ 			}
+ 
+@@ -257,7 +307,7 @@
+ 			len--;
+ 
+ 			if ((chunk == 4) || ((len == 0) && (blksize == 0))) {
+-				writel(scratch, host->ioaddr + SDHCI_BUFFER);
++				sdhci_writel(host, scratch, SDHCI_BUFFER);
+ 				chunk = 0;
+ 				scratch = 0;
+ 			}
+@@ -292,7 +342,10 @@
+ 		(host->data->blocks == 1))
+ 		mask = ~0;
+ 
+-	while (readl(host->ioaddr + SDHCI_PRESENT_STATE) & mask) {
++	while (sdhci_readl(host, SDHCI_PRESENT_STATE) & mask) {
++		if (host->quirks & SDHCI_QUIRK_PIO_NEEDS_DELAY)
++			udelay(100);
++
+ 		if (host->data->flags & MMC_DATA_READ)
+ 			sdhci_read_block_pio(host);
+ 		else
+@@ -561,6 +614,17 @@
+ 	return count;
+ }
+ 
++static void sdhci_set_transfer_irqs(struct sdhci_host *host)
++{
++	u32 pio_irqs = SDHCI_INT_DATA_AVAIL | SDHCI_INT_SPACE_AVAIL;
++	u32 dma_irqs = SDHCI_INT_DMA_END | SDHCI_INT_ADMA_ERROR;
++
++	if (host->flags & SDHCI_REQ_USE_DMA)
++		sdhci_clear_set_irqs(host, pio_irqs, dma_irqs);
++	else
++		sdhci_clear_set_irqs(host, dma_irqs, pio_irqs);
++}
++
+ static void sdhci_prepare_data(struct sdhci_host *host, struct mmc_data *data)
+ {
+ 	u8 count;
+@@ -581,7 +645,7 @@
+ 	host->data_early = 0;
+ 
+ 	count = sdhci_calc_timeout(host, data);
+-	writeb(count, host->ioaddr + SDHCI_TIMEOUT_CONTROL);
++	sdhci_writeb(host, count, SDHCI_TIMEOUT_CONTROL);
+ 
+ 	if (host->flags & SDHCI_USE_DMA)
+ 		host->flags |= SDHCI_REQ_USE_DMA;
+@@ -661,8 +725,8 @@
+ 				WARN_ON(1);
+ 				host->flags &= ~SDHCI_REQ_USE_DMA;
+ 			} else {
+-				writel(host->adma_addr,
+-					host->ioaddr + SDHCI_ADMA_ADDRESS);
++				sdhci_writel(host, host->adma_addr,
++					SDHCI_ADMA_ADDRESS);
+ 			}
+ 		} else {
+ 			int sg_cnt;
+@@ -681,8 +745,8 @@
+ 				host->flags &= ~SDHCI_REQ_USE_DMA;
+ 			} else {
+ 				WARN_ON(sg_cnt != 1);
+-				writel(sg_dma_address(data->sg),
+-					host->ioaddr + SDHCI_DMA_ADDRESS);
++				sdhci_writel(host, sg_dma_address(data->sg),
++					SDHCI_DMA_ADDRESS);
+ 			}
+ 		}
+ 	}
+@@ -693,14 +757,14 @@
+ 	 * is ADMA.
+ 	 */
+ 	if (host->version >= SDHCI_SPEC_200) {
+-		ctrl = readb(host->ioaddr + SDHCI_HOST_CONTROL);
++		ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+ 		ctrl &= ~SDHCI_CTRL_DMA_MASK;
+ 		if ((host->flags & SDHCI_REQ_USE_DMA) &&
+ 			(host->flags & SDHCI_USE_ADMA))
+ 			ctrl |= SDHCI_CTRL_ADMA32;
+ 		else
+ 			ctrl |= SDHCI_CTRL_SDMA;
+-		writeb(ctrl, host->ioaddr + SDHCI_HOST_CONTROL);
++		sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+ 	}
+ 
+ 	if (!(host->flags & SDHCI_REQ_USE_DMA)) {
+@@ -709,10 +773,11 @@
+ 		host->blocks = data->blocks;
+ 	}
+ 
++	sdhci_set_transfer_irqs(host);
++
+ 	/* We do not handle DMA boundaries, so set it to max (512 KiB) */
+-	writew(SDHCI_MAKE_BLKSZ(7, data->blksz),
+-		host->ioaddr + SDHCI_BLOCK_SIZE);
+-	writew(data->blocks, host->ioaddr + SDHCI_BLOCK_COUNT);
++	sdhci_writew(host, SDHCI_MAKE_BLKSZ(7, data->blksz), SDHCI_BLOCK_SIZE);
++	sdhci_writew(host, data->blocks, SDHCI_BLOCK_COUNT);
+ }
+ 
+ static void sdhci_set_transfer_mode(struct sdhci_host *host,
+@@ -733,7 +798,7 @@
+ 	if (host->flags & SDHCI_REQ_USE_DMA)
+ 		mode |= SDHCI_TRNS_DMA;
+ 
+-	writew(mode, host->ioaddr + SDHCI_TRANSFER_MODE);
++	sdhci_writew(host, mode, SDHCI_TRANSFER_MODE);
+ }
+ 
+ static void sdhci_finish_data(struct sdhci_host *host)
+@@ -802,7 +867,7 @@
+ 	if (host->mrq->data && (cmd == host->mrq->data->stop))
+ 		mask &= ~SDHCI_DATA_INHIBIT;
+ 
+-	while (readl(host->ioaddr + SDHCI_PRESENT_STATE) & mask) {
++	while (sdhci_readl(host, SDHCI_PRESENT_STATE) & mask) {
+ 		if (timeout == 0) {
+ 			printk(KERN_ERR "%s: Controller never released "
+ 				"inhibit bit(s).\n", mmc_hostname(host->mmc));
+@@ -821,7 +886,7 @@
+ 
+ 	sdhci_prepare_data(host, cmd->data);
+ 
+-	writel(cmd->arg, host->ioaddr + SDHCI_ARGUMENT);
++	sdhci_writel(host, cmd->arg, SDHCI_ARGUMENT);
+ 
+ 	sdhci_set_transfer_mode(host, cmd->data);
+ 
+@@ -849,8 +914,7 @@
+ 	if (cmd->data)
+ 		flags |= SDHCI_CMD_DATA;
+ 
+-	writew(SDHCI_MAKE_CMD(cmd->opcode, flags),
+-		host->ioaddr + SDHCI_COMMAND);
++	sdhci_writew(host, SDHCI_MAKE_CMD(cmd->opcode, flags), SDHCI_COMMAND);
+ }
+ 
+ static void sdhci_finish_command(struct sdhci_host *host)
+@@ -863,15 +927,15 @@
+ 		if (host->cmd->flags & MMC_RSP_136) {
+ 			/* CRC is stripped so we need to do some shifting. */
+ 			for (i = 0;i < 4;i++) {
+-				host->cmd->resp[i] = readl(host->ioaddr +
++				host->cmd->resp[i] = sdhci_readl(host,
+ 					SDHCI_RESPONSE + (3-i)*4) << 8;
+ 				if (i != 3)
+ 					host->cmd->resp[i] |=
+-						readb(host->ioaddr +
++						sdhci_readb(host,
+ 						SDHCI_RESPONSE + (3-i)*4-1);
+ 			}
+ 		} else {
+-			host->cmd->resp[0] = readl(host->ioaddr + SDHCI_RESPONSE);
++			host->cmd->resp[0] = sdhci_readl(host, SDHCI_RESPONSE);
+ 		}
+ 	}
+ 
+@@ -895,7 +959,13 @@
+ 	if (clock == host->clock)
+ 		return;
+ 
+-	writew(0, host->ioaddr + SDHCI_CLOCK_CONTROL);
++	if (host->ops->set_clock) {
++		host->ops->set_clock(host, clock);
++		if (host->quirks & SDHCI_QUIRK_NONSTANDARD_CLOCK)
++			return;
++	}
++
++	sdhci_writew(host, 0, SDHCI_CLOCK_CONTROL);
+ 
+ 	if (clock == 0)
+ 		goto out;
+@@ -908,11 +978,11 @@
+ 
+ 	clk = div << SDHCI_DIVIDER_SHIFT;
+ 	clk |= SDHCI_CLOCK_INT_EN;
+-	writew(clk, host->ioaddr + SDHCI_CLOCK_CONTROL);
++	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+ 
+ 	/* Wait max 10 ms */
+ 	timeout = 10;
+-	while (!((clk = readw(host->ioaddr + SDHCI_CLOCK_CONTROL))
++	while (!((clk = sdhci_readw(host, SDHCI_CLOCK_CONTROL))
+ 		& SDHCI_CLOCK_INT_STABLE)) {
+ 		if (timeout == 0) {
+ 			printk(KERN_ERR "%s: Internal clock never "
+@@ -925,7 +995,7 @@
+ 	}
+ 
+ 	clk |= SDHCI_CLOCK_CARD_EN;
+-	writew(clk, host->ioaddr + SDHCI_CLOCK_CONTROL);
++	sdhci_writew(host, clk, SDHCI_CLOCK_CONTROL);
+ 
+ out:
+ 	host->clock = clock;
+@@ -939,7 +1009,7 @@
+ 		return;
+ 
+ 	if (power == (unsigned short)-1) {
+-		writeb(0, host->ioaddr + SDHCI_POWER_CONTROL);
++		sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
+ 		goto out;
+ 	}
+ 
+@@ -948,7 +1018,7 @@
+ 	 * a new value. Some controllers don't seem to like this though.
+ 	 */
+ 	if (!(host->quirks & SDHCI_QUIRK_SINGLE_POWER_WRITE))
+-		writeb(0, host->ioaddr + SDHCI_POWER_CONTROL);
++		sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
+ 
+ 	pwr = SDHCI_POWER_ON;
+ 
+@@ -973,10 +1043,9 @@
+ 	 * and set turn on power at the same time, so set the voltage first.
+ 	 */
+ 	if ((host->quirks & SDHCI_QUIRK_NO_SIMULT_VDD_AND_POWER))
+-		writeb(pwr & ~SDHCI_POWER_ON,
+-				host->ioaddr + SDHCI_POWER_CONTROL);
++		sdhci_writeb(host, pwr & ~SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
+ 
+-	writeb(pwr, host->ioaddr + SDHCI_POWER_CONTROL);
++	sdhci_writeb(host, pwr, SDHCI_POWER_CONTROL);
+ 
+ out:
+ 	host->power = power;
+@@ -991,6 +1060,7 @@
+ static void sdhci_request(struct mmc_host *mmc, struct mmc_request *mrq)
+ {
+ 	struct sdhci_host *host;
++	bool present;
+ 	unsigned long flags;
+ 
+ 	host = mmc_priv(mmc);
+@@ -1005,8 +1075,14 @@
+ 
+ 	host->mrq = mrq;
+ 
+-	if (!(readl(host->ioaddr + SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)
+-		|| (host->flags & SDHCI_DEVICE_DEAD)) {
++	/* If polling, assume that the card is always present. */
++	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
++		present = true;
++	else
++		present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
++				SDHCI_CARD_PRESENT;
++
++	if (!present || host->flags & SDHCI_DEVICE_DEAD) {
+ 		host->mrq->cmd->error = -ENOMEDIUM;
+ 		tasklet_schedule(&host->finish_tasklet);
+ 	} else
+@@ -1034,8 +1110,8 @@
+ 	 * Should clear out any weird states.
+ 	 */
+ 	if (ios->power_mode == MMC_POWER_OFF) {
+-		writel(0, host->ioaddr + SDHCI_SIGNAL_ENABLE);
+-		sdhci_init(host);
++		sdhci_writel(host, 0, SDHCI_SIGNAL_ENABLE);
++		sdhci_reinit(host);
+ 	}
+ 
+ 	sdhci_set_clock(host, ios->clock);
+@@ -1045,7 +1121,7 @@
+ 	else
+ 		sdhci_set_power(host, ios->vdd);
+ 
+-	ctrl = readb(host->ioaddr + SDHCI_HOST_CONTROL);
++	ctrl = sdhci_readb(host, SDHCI_HOST_CONTROL);
+ 
+ 	if (ios->bus_width == MMC_BUS_WIDTH_4)
+ 		ctrl |= SDHCI_CTRL_4BITBUS;
+@@ -1057,7 +1133,7 @@
+ 	else
+ 		ctrl &= ~SDHCI_CTRL_HISPD;
+ 
+-	writeb(ctrl, host->ioaddr + SDHCI_HOST_CONTROL);
++	sdhci_writeb(host, ctrl, SDHCI_HOST_CONTROL);
+ 
+ 	/*
+ 	 * Some (ENE) controllers go apeshit on some ios operation,
+@@ -1085,10 +1161,12 @@
+ 	if (host->flags & SDHCI_DEVICE_DEAD)
+ 		present = 0;
+ 	else
+-		present = readl(host->ioaddr + SDHCI_PRESENT_STATE);
++		present = sdhci_readl(host, SDHCI_PRESENT_STATE);
+ 
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ 
++	if (host->quirks & SDHCI_QUIRK_INVERTED_WRITE_PROTECT)
++		return !!(present & SDHCI_WRITE_PROTECT);
+ 	return !(present & SDHCI_WRITE_PROTECT);
+ }
+ 
+@@ -1096,7 +1174,6 @@
+ {
+ 	struct sdhci_host *host;
+ 	unsigned long flags;
+-	u32 ier;
+ 
+ 	host = mmc_priv(mmc);
+ 
+@@ -1105,15 +1182,10 @@
+ 	if (host->flags & SDHCI_DEVICE_DEAD)
+ 		goto out;
+ 
+-	ier = readl(host->ioaddr + SDHCI_INT_ENABLE);
+-
+-	ier &= ~SDHCI_INT_CARD_INT;
+ 	if (enable)
+-		ier |= SDHCI_INT_CARD_INT;
+-
+-	writel(ier, host->ioaddr + SDHCI_INT_ENABLE);
+-	writel(ier, host->ioaddr + SDHCI_SIGNAL_ENABLE);
+-
++		sdhci_unmask_irqs(host, SDHCI_INT_CARD_INT);
++	else
++		sdhci_mask_irqs(host, SDHCI_INT_CARD_INT);
+ out:
+ 	mmiowb();
+ 
+@@ -1142,7 +1214,7 @@
+ 
+ 	spin_lock_irqsave(&host->lock, flags);
+ 
+-	if (!(readl(host->ioaddr + SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)) {
++	if (!(sdhci_readl(host, SDHCI_PRESENT_STATE) & SDHCI_CARD_PRESENT)) {
+ 		if (host->mrq) {
+ 			printk(KERN_ERR "%s: Card removed during transfer!\n",
+ 				mmc_hostname(host->mmc));
+@@ -1346,8 +1418,8 @@
+ 		 * we need to at least restart the transfer.
+ 		 */
+ 		if (intmask & SDHCI_INT_DMA_END)
+-			writel(readl(host->ioaddr + SDHCI_DMA_ADDRESS),
+-				host->ioaddr + SDHCI_DMA_ADDRESS);
++			sdhci_writel(host, sdhci_readl(host, SDHCI_DMA_ADDRESS),
++				SDHCI_DMA_ADDRESS);
+ 
+ 		if (intmask & SDHCI_INT_DATA_END) {
+ 			if (host->cmd) {
+@@ -1373,7 +1445,7 @@
+ 
+ 	spin_lock(&host->lock);
+ 
+-	intmask = readl(host->ioaddr + SDHCI_INT_STATUS);
++	intmask = sdhci_readl(host, SDHCI_INT_STATUS);
+ 
+ 	if (!intmask || intmask == 0xffffffff) {
+ 		result = IRQ_NONE;
+@@ -1384,22 +1456,22 @@
+ 		mmc_hostname(host->mmc), intmask);
+ 
+ 	if (intmask & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
+-		writel(intmask & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE),
+-			host->ioaddr + SDHCI_INT_STATUS);
++		sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
++			SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
+ 		tasklet_schedule(&host->card_tasklet);
+ 	}
+ 
+ 	intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
+ 
+ 	if (intmask & SDHCI_INT_CMD_MASK) {
+-		writel(intmask & SDHCI_INT_CMD_MASK,
+-			host->ioaddr + SDHCI_INT_STATUS);
++		sdhci_writel(host, intmask & SDHCI_INT_CMD_MASK,
++			SDHCI_INT_STATUS);
+ 		sdhci_cmd_irq(host, intmask & SDHCI_INT_CMD_MASK);
+ 	}
+ 
+ 	if (intmask & SDHCI_INT_DATA_MASK) {
+-		writel(intmask & SDHCI_INT_DATA_MASK,
+-			host->ioaddr + SDHCI_INT_STATUS);
++		sdhci_writel(host, intmask & SDHCI_INT_DATA_MASK,
++			SDHCI_INT_STATUS);
+ 		sdhci_data_irq(host, intmask & SDHCI_INT_DATA_MASK);
+ 	}
+ 
+@@ -1410,7 +1482,7 @@
+ 	if (intmask & SDHCI_INT_BUS_POWER) {
+ 		printk(KERN_ERR "%s: Card is consuming too much power!\n",
+ 			mmc_hostname(host->mmc));
+-		writel(SDHCI_INT_BUS_POWER, host->ioaddr + SDHCI_INT_STATUS);
++		sdhci_writel(host, SDHCI_INT_BUS_POWER, SDHCI_INT_STATUS);
+ 	}
+ 
+ 	intmask &= ~SDHCI_INT_BUS_POWER;
+@@ -1425,7 +1497,7 @@
+ 			mmc_hostname(host->mmc), intmask);
+ 		sdhci_dumpregs(host);
+ 
+-		writel(intmask, host->ioaddr + SDHCI_INT_STATUS);
++		sdhci_writel(host, intmask, SDHCI_INT_STATUS);
+ 	}
+ 
+ 	result = IRQ_HANDLED;
+@@ -1455,6 +1527,8 @@
+ {
+ 	int ret;
+ 
++	sdhci_disable_card_detection(host);
++
+ 	ret = mmc_suspend_host(host->mmc, state);
+ 	if (ret)
+ 		return ret;
+@@ -1487,6 +1561,8 @@
+ 	if (ret)
+ 		return ret;
+ 
++	sdhci_enable_card_detection(host);
++
+ 	return 0;
+ }
+ 
+@@ -1537,7 +1613,7 @@
+ 
+ 	sdhci_reset(host, SDHCI_RESET_ALL);
+ 
+-	host->version = readw(host->ioaddr + SDHCI_HOST_VERSION);
++	host->version = sdhci_readw(host, SDHCI_HOST_VERSION);
+ 	host->version = (host->version & SDHCI_SPEC_VER_MASK)
+ 				>> SDHCI_SPEC_VER_SHIFT;
+ 	if (host->version > SDHCI_SPEC_200) {
+@@ -1546,7 +1622,7 @@
+ 			host->version);
+ 	}
+ 
+-	caps = readl(host->ioaddr + SDHCI_CAPABILITIES);
++	caps = sdhci_readl(host, SDHCI_CAPABILITIES);
+ 
+ 	if (host->quirks & SDHCI_QUIRK_FORCE_DMA)
+ 		host->flags |= SDHCI_USE_DMA;
+@@ -1614,19 +1690,27 @@
+ 
+ 	host->max_clk =
+ 		(caps & SDHCI_CLOCK_BASE_MASK) >> SDHCI_CLOCK_BASE_SHIFT;
++	host->max_clk *= 1000000;
+ 	if (host->max_clk == 0) {
+-		printk(KERN_ERR "%s: Hardware doesn't specify base clock "
+-			"frequency.\n", mmc_hostname(mmc));
+-		return -ENODEV;
++		if (!host->ops->get_max_clock) {
++			printk(KERN_ERR
++			       "%s: Hardware doesn't specify base clock "
++			       "frequency.\n", mmc_hostname(mmc));
++			return -ENODEV;
++		}
++		host->max_clk = host->ops->get_max_clock(host);
+ 	}
+-	host->max_clk *= 1000000;
+ 
+ 	host->timeout_clk =
+ 		(caps & SDHCI_TIMEOUT_CLK_MASK) >> SDHCI_TIMEOUT_CLK_SHIFT;
+ 	if (host->timeout_clk == 0) {
+-		printk(KERN_ERR "%s: Hardware doesn't specify timeout clock "
+-			"frequency.\n", mmc_hostname(mmc));
+-		return -ENODEV;
++		if (!host->ops->get_timeout_clock) {
++			printk(KERN_ERR
++			       "%s: Hardware doesn't specify timeout clock "
++			       "frequency.\n", mmc_hostname(mmc));
++			return -ENODEV;
++		}
++		host->timeout_clk = host->ops->get_timeout_clock(host);
+ 	}
+ 	if (caps & SDHCI_TIMEOUT_CLK_UNIT)
+ 		host->timeout_clk *= 1000;
+@@ -1639,9 +1723,12 @@
+ 	mmc->f_max = host->max_clk;
+ 	mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
+ 
+-	if (caps & SDHCI_CAN_DO_HISPD)
++	if ((caps & SDHCI_CAN_DO_HISPD) && !(host->quirks & SDHCI_QUIRK_BROKEN_HIGH_SPEED_MODE))
+ 		mmc->caps |= MMC_CAP_SD_HIGHSPEED;
+ 
++	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
++		mmc->caps |= MMC_CAP_NEEDS_POLL;
++
+ 	mmc->ocr_avail = 0;
+ 	if (caps & SDHCI_CAN_VDD_330)
+ 		mmc->ocr_avail |= MMC_VDD_32_33|MMC_VDD_33_34;
+@@ -1690,13 +1777,19 @@
+ 	 * Maximum block size. This varies from controller to controller and
+ 	 * is specified in the capabilities register.
+ 	 */
+-	mmc->max_blk_size = (caps & SDHCI_MAX_BLOCK_MASK) >> SDHCI_MAX_BLOCK_SHIFT;
+-	if (mmc->max_blk_size >= 3) {
+-		printk(KERN_WARNING "%s: Invalid maximum block size, "
+-			"assuming 512 bytes\n", mmc_hostname(mmc));
+-		mmc->max_blk_size = 512;
+-	} else
+-		mmc->max_blk_size = 512 << mmc->max_blk_size;
++	if (host->quirks & SDHCI_QUIRK_FORCE_BLK_SZ_2048) {
++		mmc->max_blk_size = 2;
++	} else {
++		mmc->max_blk_size = (caps & SDHCI_MAX_BLOCK_MASK) >>
++				SDHCI_MAX_BLOCK_SHIFT;
++		if (mmc->max_blk_size > 3) {
++			printk(KERN_WARNING "%s: Invalid maximum block size, "
++				"assuming 512 bytes\n", mmc_hostname(mmc));
++			mmc->max_blk_size = 0;
++		}
++	}
++
++	mmc->max_blk_size = 512 << mmc->max_blk_size;
+ 
+ 	/*
+ 	 * Maximum block count.
+@@ -1746,6 +1839,8 @@
+ 		(host->flags & SDHCI_USE_ADMA)?"A":"",
+ 		(host->flags & SDHCI_USE_DMA)?"DMA":"PIO");
+ 
++	sdhci_enable_card_detection(host);
++
+ 	return 0;
+ 
+ #ifdef SDHCI_USE_LEDS_CLASS
+@@ -1782,6 +1877,8 @@
+ 		spin_unlock_irqrestore(&host->lock, flags);
+ 	}
+ 
++	sdhci_disable_card_detection(host);
++
+ 	mmc_remove_host(host->mmc);
+ 
+ #ifdef SDHCI_USE_LEDS_CLASS
+@@ -1838,7 +1935,7 @@
+ 
+ module_param(debug_quirks, uint, 0444);
+ 
+-MODULE_AUTHOR("Pierre Ossman <drzeus@drzeus.cx>");
++MODULE_AUTHOR("Pierre Ossman <pierre@ossman.eu>");
+ MODULE_DESCRIPTION("Secure Digital Host Controller Interface core driver");
+ MODULE_LICENSE("GPL");
+ 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/sdhci.h linux-2.6.29/drivers/mmc/host/sdhci.h
+--- linux-2.6.29.ref/drivers/mmc/host/sdhci.h	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/sdhci.h	2011-05-31 10:42:56.603953873 -0700
+@@ -10,6 +10,9 @@
+  */
+ 
+ #include <linux/scatterlist.h>
++#include <linux/compiler.h>
++#include <linux/types.h>
++#include <linux/io.h>
+ 
+ /*
+  * Controller registers
+@@ -122,7 +125,8 @@
+ #define  SDHCI_INT_DATA_MASK	(SDHCI_INT_DATA_END | SDHCI_INT_DMA_END | \
+ 		SDHCI_INT_DATA_AVAIL | SDHCI_INT_SPACE_AVAIL | \
+ 		SDHCI_INT_DATA_TIMEOUT | SDHCI_INT_DATA_CRC | \
+-		SDHCI_INT_DATA_END_BIT)
++		SDHCI_INT_DATA_END_BIT | SDHCI_ADMA_ERROR)
++#define SDHCI_INT_ALL_MASK	((unsigned int)-1)
+ 
+ #define SDHCI_ACMD12_ERR	0x3C
+ 
+@@ -210,7 +214,20 @@
+ #define SDHCI_QUIRK_BROKEN_SMALL_PIO			(1<<13)
+ /* Controller does not provide transfer-complete interrupt when not busy */
+ #define SDHCI_QUIRK_NO_BUSY_IRQ				(1<<14)
+-
++/* Controller has unreliable card detection */
++#define SDHCI_QUIRK_BROKEN_CARD_DETECTION		(1<<15)
++/* Controller reports inverted write-protect state */
++#define SDHCI_QUIRK_INVERTED_WRITE_PROTECT		(1<<16)
++/* Controller has nonstandard clock management */
++#define SDHCI_QUIRK_NONSTANDARD_CLOCK			(1<<17)
++/* Controller does not like fast PIO transfers */
++#define SDHCI_QUIRK_PIO_NEEDS_DELAY			(1<<18)
++/* Controller losing signal/interrupt enable states after reset */
++#define SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET		(1<<19)
++/* Controller has to be forced to use block size of 2048 bytes */
++#define SDHCI_QUIRK_FORCE_BLK_SZ_2048			(1<<20)
++/* Controller has an issue operating at 50MHz*/
++#define SDHCI_QUIRK_BROKEN_HIGH_SPEED_MODE		(1<<21)
+ 	int			irq;		/* Device IRQ */
+ 	void __iomem *		ioaddr;		/* Mapped address */
+ 
+@@ -267,9 +284,105 @@
+ 
+ 
+ struct sdhci_ops {
++#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
++	u32		(*readl)(struct sdhci_host *host, int reg);
++	u16		(*readw)(struct sdhci_host *host, int reg);
++	u8		(*readb)(struct sdhci_host *host, int reg);
++	void		(*writel)(struct sdhci_host *host, u32 val, int reg);
++	void		(*writew)(struct sdhci_host *host, u16 val, int reg);
++	void		(*writeb)(struct sdhci_host *host, u8 val, int reg);
++#endif
++
++	void	(*set_clock)(struct sdhci_host *host, unsigned int clock);
++
+ 	int		(*enable_dma)(struct sdhci_host *host);
++	unsigned int	(*get_max_clock)(struct sdhci_host *host);
++	unsigned int	(*get_timeout_clock)(struct sdhci_host *host);
+ };
+ 
++#ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
++
++static inline void sdhci_writel(struct sdhci_host *host, u32 val, int reg)
++{
++	if (unlikely(host->ops->writel))
++		host->ops->writel(host, val, reg);
++	else
++		writel(val, host->ioaddr + reg);
++}
++
++static inline void sdhci_writew(struct sdhci_host *host, u16 val, int reg)
++{
++	if (unlikely(host->ops->writew))
++		host->ops->writew(host, val, reg);
++	else
++		writew(val, host->ioaddr + reg);
++}
++
++static inline void sdhci_writeb(struct sdhci_host *host, u8 val, int reg)
++{
++	if (unlikely(host->ops->writeb))
++		host->ops->writeb(host, val, reg);
++	else
++		writeb(val, host->ioaddr + reg);
++}
++
++static inline u32 sdhci_readl(struct sdhci_host *host, int reg)
++{
++	if (unlikely(host->ops->readl))
++		return host->ops->readl(host, reg);
++	else
++		return readl(host->ioaddr + reg);
++}
++
++static inline u16 sdhci_readw(struct sdhci_host *host, int reg)
++{
++	if (unlikely(host->ops->readw))
++		return host->ops->readw(host, reg);
++	else
++		return readw(host->ioaddr + reg);
++}
++
++static inline u8 sdhci_readb(struct sdhci_host *host, int reg)
++{
++	if (unlikely(host->ops->readb))
++		return host->ops->readb(host, reg);
++	else
++		return readb(host->ioaddr + reg);
++}
++
++#else
++
++static inline void sdhci_writel(struct sdhci_host *host, u32 val, int reg)
++{
++	writel(val, host->ioaddr + reg);
++}
++
++static inline void sdhci_writew(struct sdhci_host *host, u16 val, int reg)
++{
++	writew(val, host->ioaddr + reg);
++}
++
++static inline void sdhci_writeb(struct sdhci_host *host, u8 val, int reg)
++{
++	writeb(val, host->ioaddr + reg);
++}
++
++static inline u32 sdhci_readl(struct sdhci_host *host, int reg)
++{
++	return readl(host->ioaddr + reg);
++}
++
++static inline u16 sdhci_readw(struct sdhci_host *host, int reg)
++{
++	return readw(host->ioaddr + reg);
++}
++
++static inline u8 sdhci_readb(struct sdhci_host *host, int reg)
++{
++	return readb(host->ioaddr + reg);
++}
++
++#endif /* CONFIG_MMC_SDHCI_IO_ACCESSORS */
+ 
+ extern struct sdhci_host *sdhci_alloc_host(struct device *dev,
+ 	size_t priv_size);
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/sdhci-of.c linux-2.6.29/drivers/mmc/host/sdhci-of.c
+--- linux-2.6.29.ref/drivers/mmc/host/sdhci-of.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/drivers/mmc/host/sdhci-of.c	2011-05-31 10:42:56.603953873 -0700
+@@ -0,0 +1,316 @@
++/*
++ * OpenFirmware bindings for Secure Digital Host Controller Interface.
++ *
++ * Copyright (c) 2007 Freescale Semiconductor, Inc.
++ * Copyright (c) 2009 MontaVista Software, Inc.
++ *
++ * Authors: Xiaobo Xie <X.Xie@freescale.com>
++ *	    Anton Vorontsov <avorontsov@ru.mvista.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or (at
++ * your option) any later version.
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/interrupt.h>
++#include <linux/delay.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/mmc/host.h>
++#include "sdhci.h"
++
++struct sdhci_of_data {
++	unsigned int quirks;
++	struct sdhci_ops ops;
++};
++
++struct sdhci_of_host {
++	unsigned int clock;
++	u16 xfer_mode_shadow;
++};
++
++/*
++ * Ops and quirks for the Freescale eSDHC controller.
++ */
++
++#define ESDHC_DMA_SYSCTL	0x40c
++#define ESDHC_DMA_SNOOP		0x00000040
++
++#define ESDHC_SYSTEM_CONTROL	0x2c
++#define ESDHC_CLOCK_MASK	0x0000fff0
++#define ESDHC_PREDIV_SHIFT	8
++#define ESDHC_DIVIDER_SHIFT	4
++#define ESDHC_CLOCK_PEREN	0x00000004
++#define ESDHC_CLOCK_HCKEN	0x00000002
++#define ESDHC_CLOCK_IPGEN	0x00000001
++
++static u32 esdhc_readl(struct sdhci_host *host, int reg)
++{
++	return in_be32(host->ioaddr + reg);
++}
++
++static u16 esdhc_readw(struct sdhci_host *host, int reg)
++{
++	u16 ret;
++
++	if (unlikely(reg == SDHCI_HOST_VERSION))
++		ret = in_be16(host->ioaddr + reg);
++	else
++		ret = in_be16(host->ioaddr + (reg ^ 0x2));
++	return ret;
++}
++
++static u8 esdhc_readb(struct sdhci_host *host, int reg)
++{
++	return in_8(host->ioaddr + (reg ^ 0x3));
++}
++
++static void esdhc_writel(struct sdhci_host *host, u32 val, int reg)
++{
++	out_be32(host->ioaddr + reg, val);
++}
++
++static void esdhc_writew(struct sdhci_host *host, u16 val, int reg)
++{
++	struct sdhci_of_host *of_host = sdhci_priv(host);
++	int base = reg & ~0x3;
++	int shift = (reg & 0x2) * 8;
++
++	switch (reg) {
++	case SDHCI_TRANSFER_MODE:
++		/*
++		 * Postpone this write, we must do it together with a
++		 * command write that is down below.
++		 */
++		of_host->xfer_mode_shadow = val;
++		return;
++	case SDHCI_COMMAND:
++		esdhc_writel(host, val << 16 | of_host->xfer_mode_shadow,
++			     SDHCI_TRANSFER_MODE);
++		return;
++	case SDHCI_BLOCK_SIZE:
++		/*
++		 * Two last DMA bits are reserved, and first one is used for
++		 * non-standard blksz of 4096 bytes that we don't support
++		 * yet. So clear the DMA boundary bits.
++		 */
++		val &= ~SDHCI_MAKE_BLKSZ(0x7, 0);
++		/* fall through */
++	}
++	clrsetbits_be32(host->ioaddr + base, 0xffff << shift, val << shift);
++}
++
++static void esdhc_writeb(struct sdhci_host *host, u8 val, int reg)
++{
++	int base = reg & ~0x3;
++	int shift = (reg & 0x3) * 8;
++
++	clrsetbits_be32(host->ioaddr + base , 0xff << shift, val << shift);
++}
++
++static void esdhc_set_clock(struct sdhci_host *host, unsigned int clock)
++{
++	int div;
++	int pre_div = 2;
++
++	clrbits32(host->ioaddr + ESDHC_SYSTEM_CONTROL, ESDHC_CLOCK_IPGEN |
++		  ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN | ESDHC_CLOCK_MASK);
++
++	if (clock == 0)
++		goto out;
++
++	if (host->max_clk / 16 > clock) {
++		for (; pre_div < 256; pre_div *= 2) {
++			if (host->max_clk / pre_div < clock * 16)
++				break;
++		}
++	}
++
++	for (div = 1; div <= 16; div++) {
++		if (host->max_clk / (div * pre_div) <= clock)
++			break;
++	}
++
++	pre_div >>= 1;
++
++	setbits32(host->ioaddr + ESDHC_SYSTEM_CONTROL, ESDHC_CLOCK_IPGEN |
++		  ESDHC_CLOCK_HCKEN | ESDHC_CLOCK_PEREN |
++		  div << ESDHC_DIVIDER_SHIFT | pre_div << ESDHC_PREDIV_SHIFT);
++	mdelay(100);
++out:
++	host->clock = clock;
++}
++
++static int esdhc_enable_dma(struct sdhci_host *host)
++{
++	setbits32(host->ioaddr + ESDHC_DMA_SYSCTL, ESDHC_DMA_SNOOP);
++	return 0;
++}
++
++static unsigned int esdhc_get_max_clock(struct sdhci_host *host)
++{
++	struct sdhci_of_host *of_host = sdhci_priv(host);
++
++	return of_host->clock;
++}
++
++static unsigned int esdhc_get_timeout_clock(struct sdhci_host *host)
++{
++	struct sdhci_of_host *of_host = sdhci_priv(host);
++
++	return of_host->clock / 1000;
++}
++
++static struct sdhci_of_data sdhci_esdhc = {
++	.quirks = SDHCI_QUIRK_FORCE_BLK_SZ_2048 |
++		  SDHCI_QUIRK_BROKEN_CARD_DETECTION |
++		  SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
++		  SDHCI_QUIRK_NO_BUSY_IRQ |
++		  SDHCI_QUIRK_NONSTANDARD_CLOCK |
++		  SDHCI_QUIRK_PIO_NEEDS_DELAY |
++		  SDHCI_QUIRK_RESTORE_IRQS_AFTER_RESET |
++		  SDHCI_QUIRK_NO_CARD_NO_RESET,
++	.ops = {
++		.readl = esdhc_readl,
++		.readw = esdhc_readw,
++		.readb = esdhc_readb,
++		.writel = esdhc_writel,
++		.writew = esdhc_writew,
++		.writeb = esdhc_writeb,
++		.set_clock = esdhc_set_clock,
++		.enable_dma = esdhc_enable_dma,
++		.get_max_clock = esdhc_get_max_clock,
++		.get_timeout_clock = esdhc_get_timeout_clock,
++	},
++};
++
++#ifdef CONFIG_PM
++
++static int sdhci_of_suspend(struct of_device *ofdev, pm_message_t state)
++{
++	struct sdhci_host *host = dev_get_drvdata(&ofdev->dev);
++
++	return mmc_suspend_host(host->mmc, state);
++}
++
++static int sdhci_of_resume(struct of_device *ofdev)
++{
++	struct sdhci_host *host = dev_get_drvdata(&ofdev->dev);
++
++	return mmc_resume_host(host->mmc);
++}
++
++#else
++
++#define sdhci_of_suspend NULL
++#define sdhci_of_resume NULL
++
++#endif
++
++static int __devinit sdhci_of_probe(struct of_device *ofdev,
++				 const struct of_device_id *match)
++{
++	struct device_node *np = ofdev->node;
++	struct sdhci_of_data *sdhci_of_data = match->data;
++	struct sdhci_host *host;
++	struct sdhci_of_host *of_host;
++	const u32 *clk;
++	int size;
++	int ret;
++
++	if (!of_device_is_available(np))
++		return -ENODEV;
++
++	host = sdhci_alloc_host(&ofdev->dev, sizeof(*of_host));
++	if (!host)
++		return -ENOMEM;
++
++	of_host = sdhci_priv(host);
++	dev_set_drvdata(&ofdev->dev, host);
++
++	host->ioaddr = of_iomap(np, 0);
++	if (!host->ioaddr) {
++		ret = -ENOMEM;
++		goto err_addr_map;
++	}
++
++	host->irq = irq_of_parse_and_map(np, 0);
++	if (!host->irq) {
++		ret = -EINVAL;
++		goto err_no_irq;
++	}
++
++	host->hw_name = dev_name(&ofdev->dev);
++	if (sdhci_of_data) {
++		host->quirks = sdhci_of_data->quirks;
++		host->ops = &sdhci_of_data->ops;
++	}
++
++	clk = of_get_property(np, "clock-frequency", &size);
++	if (clk && size == sizeof(*clk) && *clk)
++		of_host->clock = *clk;
++
++	ret = sdhci_add_host(host);
++	if (ret)
++		goto err_add_host;
++
++	return 0;
++
++err_add_host:
++	irq_dispose_mapping(host->irq);
++err_no_irq:
++	iounmap(host->ioaddr);
++err_addr_map:
++	sdhci_free_host(host);
++	return ret;
++}
++
++static int __devexit sdhci_of_remove(struct of_device *ofdev)
++{
++	struct sdhci_host *host = dev_get_drvdata(&ofdev->dev);
++
++	sdhci_remove_host(host, 0);
++	sdhci_free_host(host);
++	irq_dispose_mapping(host->irq);
++	iounmap(host->ioaddr);
++	return 0;
++}
++
++static const struct of_device_id sdhci_of_match[] = {
++	{ .compatible = "fsl,mpc8379-esdhc", .data = &sdhci_esdhc, },
++	{ .compatible = "fsl,mpc8536-esdhc", .data = &sdhci_esdhc, },
++	{ .compatible = "fsl,esdhc", .data = &sdhci_esdhc, },
++	{ .compatible = "generic-sdhci", },
++	{},
++};
++MODULE_DEVICE_TABLE(of, sdhci_of_match);
++
++static struct of_platform_driver sdhci_of_driver = {
++	.driver.name = "sdhci-of",
++	.match_table = sdhci_of_match,
++	.probe = sdhci_of_probe,
++	.remove = __devexit_p(sdhci_of_remove),
++	.suspend = sdhci_of_suspend,
++	.resume	= sdhci_of_resume,
++};
++
++static int __init sdhci_of_init(void)
++{
++	return of_register_platform_driver(&sdhci_of_driver);
++}
++module_init(sdhci_of_init);
++
++static void __exit sdhci_of_exit(void)
++{
++	of_unregister_platform_driver(&sdhci_of_driver);
++}
++module_exit(sdhci_of_exit);
++
++MODULE_DESCRIPTION("Secure Digital Host Controller Interface OF driver");
++MODULE_AUTHOR("Xiaobo Xie <X.Xie@freescale.com>, "
++	      "Anton Vorontsov <avorontsov@ru.mvista.com>");
++MODULE_LICENSE("GPL");
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/sdhci-pci.c linux-2.6.29/drivers/mmc/host/sdhci-pci.c
+--- linux-2.6.29.ref/drivers/mmc/host/sdhci-pci.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/sdhci-pci.c	2011-05-31 10:42:56.603953873 -0700
+@@ -380,7 +380,7 @@
+ 			"doesn't fully claim to support it.\n");
+ 	}
+ 
+-	ret = pci_set_dma_mask(pdev, DMA_32BIT_MASK);
++	ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
+ 	if (ret)
+ 		return ret;
+ 
+@@ -522,8 +522,8 @@
+ 
+ 	host = sdhci_alloc_host(&pdev->dev, sizeof(struct sdhci_pci_slot));
+ 	if (IS_ERR(host)) {
+-		ret = PTR_ERR(host);
+-		goto unmap;
++		dev_err(&pdev->dev, "cannot allocate host\n");
++		return ERR_PTR(PTR_ERR(host));
+ 	}
+ 
+ 	slot = sdhci_priv(host);
+@@ -541,7 +541,7 @@
+ 	ret = pci_request_region(pdev, bar, mmc_hostname(host->mmc));
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "cannot request region\n");
+-		return ERR_PTR(ret);
++		goto free;
+ 	}
+ 
+ 	addr = pci_resource_start(pdev, bar);
+@@ -572,6 +572,8 @@
+ 
+ release:
+ 	pci_release_region(pdev, bar);
++
++free:
+ 	sdhci_free_host(host);
+ 
+ 	return ERR_PTR(ret);
+@@ -729,6 +731,6 @@
+ module_init(sdhci_drv_init);
+ module_exit(sdhci_drv_exit);
+ 
+-MODULE_AUTHOR("Pierre Ossman <drzeus@drzeus.cx>");
++MODULE_AUTHOR("Pierre Ossman <pierre@ossman.eu>");
+ MODULE_DESCRIPTION("Secure Digital Host Controller Interface PCI driver");
+ MODULE_LICENSE("GPL");
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/sdhci-tangox.c linux-2.6.29/drivers/mmc/host/sdhci-tangox.c
+--- linux-2.6.29.ref/drivers/mmc/host/sdhci-tangox.c	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/drivers/mmc/host/sdhci-tangox.c	2011-05-31 10:43:21.081077502 -0700
+@@ -0,0 +1,562 @@
++/*
++ *  linux/drivers/mmc/host/sdhci-tangox.c - SDHCI on Sigma Designs' SDIO interface
++ *
++ *  Copyright (C) 2005-2009 Sigma Designs, Inc.
++ *
++ *  Origianlly from
++ *
++ *  linux/drivers/mmc/host/sdhci-pci.c - SDHCI on PCI bus interface
++ *
++ *  Copyright (C) 2005-2008 Pierre Ossman, All Rights Reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or (at
++ * your option) any later version.
++ *
++ * Thanks to the following companies for their support:
++ *
++ *     - JMicron (hardware and technical support)
++ */
++
++#include <linux/platform_device.h>
++#include <linux/delay.h>
++#include <linux/highmem.h>
++#include <linux/dma-mapping.h>
++
++#include <linux/mmc/host.h>
++#if defined(CONFIG_TANGO3)
++#include <asm/tango3/hardware.h>
++#include <asm/tango3/emhwlib_registers_tango3.h>
++#endif
++#include <asm/scatterlist.h>
++#include <asm/io.h>
++
++#include "sdhci.h"
++
++#define MAX_SLOTS			2
++#define LOG2_CPU_SDIO0_INT		60
++#define LOG2_CPU_SDIO1_INT		61
++
++struct sdio_controller {
++	unsigned long base;
++	unsigned int irq;
++};
++#define TANGOX_SDIO_BASE_ADDR		(REG_BASE_host_interface + 0x1000)
++#define TANGOX_SDIO_BASE_ADDR1		(REG_BASE_host_interface + 0x1200)
++
++static struct sdio_controller tangox_hosts[] = {
++	{ KSEG1ADDR(TANGOX_SDIO_BASE_ADDR), IRQ_CONTROLLER_IRQ_BASE  + LOG2_CPU_SDIO0_INT },
++	{ KSEG1ADDR(TANGOX_SDIO_BASE_ADDR1), IRQ_CONTROLLER_IRQ_BASE  + LOG2_CPU_SDIO1_INT },
++};
++
++struct sdhci_tangox_chip;
++struct sdhci_tangox_slot;
++
++struct sdhci_tangox_fixes {
++	unsigned int		quirks;
++
++	int			(*probe)(struct sdhci_tangox_chip*);
++
++	int			(*probe_slot)(struct sdhci_tangox_slot*);
++	void			(*remove_slot)(struct sdhci_tangox_slot*, int);
++
++	int			(*suspend)(struct sdhci_tangox_chip*,
++					pm_message_t);
++	int			(*resume)(struct sdhci_tangox_chip*);
++};
++
++struct sdhci_tangox_slot {
++	struct sdhci_tangox_chip	*chip;
++	struct sdhci_host		*host;
++};
++
++struct sdhci_tangox_chip {
++	unsigned int		quirks;
++	struct sdhci_tangox_fixes *fixes;
++	struct device		*pdev;
++
++	int			num_slots;	/* Slots on controller */
++	struct sdhci_tangox_slot	*slots[MAX_SLOTS]; /* Pointers to host slots */
++};
++static unsigned int sdio_hosts = 3; 
++static int force_speed = -1; /* -1: auto, 0: low, 1: high */ 
++extern int tangox_sdio_enabled(int idx);
++extern unsigned long tangox_chip_id(void);
++/*****************************************************************************\
++ *                                                                           *
++ * Hardware specific quirk handling                                          *
++ *                                                                           *
++\*****************************************************************************/
++
++static int tangox_probe(struct sdhci_tangox_chip *chip)
++{
++	return 0;
++}
++
++static int tangox_probe_slot(struct sdhci_tangox_slot *slot)
++{
++	return 0;
++}
++
++static void tangox_remove_slot(struct sdhci_tangox_slot *slot, int dead)
++{
++	return;
++}
++
++static int tangox_suspend(struct sdhci_tangox_chip *chip, pm_message_t state)
++{
++	return 0;
++}
++
++static int tangox_resume(struct sdhci_tangox_chip *chip)
++{
++	return 0;
++}
++
++static struct sdhci_tangox_fixes sdhci_tangox = {
++	.quirks		= 0,
++	.probe		= tangox_probe,
++
++	.probe_slot	= tangox_probe_slot,
++	.remove_slot	= tangox_remove_slot,
++
++	.suspend	= tangox_suspend,
++	.resume		= tangox_resume,
++};
++
++/*****************************************************************************\
++ *                                                                           *
++ * SDHCI core callbacks                                                      *
++ *                                                                           *
++\*****************************************************************************/
++
++static int sdhci_tangox_enable_dma(struct sdhci_host *host)
++{
++	/* DMA should be OK */
++	return 0;
++}
++
++static struct sdhci_ops sdhci_tangox_ops = {
++	.enable_dma	= sdhci_tangox_enable_dma,
++};
++
++/*****************************************************************************\
++ *                                                                           *
++ * Suspend/resume                                                            *
++ *                                                                           *
++\*****************************************************************************/
++
++#ifdef CONFIG_PM
++
++static int sdhci_tangox_suspend (struct device *pdev, pm_message_t state)
++{
++	struct sdhci_tangox_chip *chip;
++	struct sdhci_tangox_slot *slot;
++	int i, ret;
++
++	chip = dev_get_drvdata(pdev);
++	if (!chip)
++		return 0;
++
++	for (i = 0; i < chip->num_slots; i++) {
++		slot = chip->slots[i];
++		if (!slot)
++			continue;
++
++		ret = sdhci_suspend_host(slot->host, state);
++
++		if (ret) {
++			for (i--; i >= 0; i--)
++				sdhci_resume_host(chip->slots[i]->host);
++			return ret;
++		}
++	}
++
++	if (chip->fixes && chip->fixes->suspend) {
++		ret = chip->fixes->suspend(chip, state);
++		if (ret) {
++			for (i = chip->num_slots - 1; i >= 0; i--)
++				sdhci_resume_host(chip->slots[i]->host);
++			return ret;
++		}
++	}
++
++	// TODO: put it to suspend mode 
++
++	return 0;
++}
++
++static int sdhci_tangox_resume(struct device *pdev)
++{
++	struct sdhci_tangox_chip *chip;
++	struct sdhci_tangox_slot *slot;
++	int i, ret;
++
++	chip = dev_get_drvdata(pdev);
++	if (!chip)
++		return 0;
++
++	// TODO: resume 
++
++	if (chip->fixes && chip->fixes->resume) {
++		ret = chip->fixes->resume(chip);
++		if (ret)
++			return ret;
++	}
++
++	for (i = 0; i < chip->num_slots; i++) {
++		slot = chip->slots[i];
++		if (!slot)
++			continue;
++
++		ret = sdhci_resume_host(slot->host);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++#else 
++#define sdhci_tangox_suspend NULL
++#define sdhci_tangox_resume NULL
++#endif /* CONFIG_PM */
++
++/*****************************************************************************\
++ *                                                                           *
++ * Device probing/removal                                                    *
++ *                                                                           *
++\*****************************************************************************/
++
++static struct sdhci_tangox_slot *sdhci_tangox_probe_slot(
++				struct device *pdev, struct sdhci_tangox_chip *chip, int idx)
++{
++	struct sdhci_tangox_slot *slot;
++	struct sdhci_host *host;
++	int ret;
++
++	host = sdhci_alloc_host(pdev, sizeof(struct sdhci_tangox_slot));
++	if (IS_ERR(host)) {
++		dev_err(pdev, "cannot allocate host\n");
++		return ERR_PTR(PTR_ERR(host));
++	}
++
++	slot = sdhci_priv(host);
++
++	slot->chip = chip;
++	slot->host = host;
++
++	host->hw_name = "SDIO";
++	host->ops = &sdhci_tangox_ops;
++	host->quirks = chip->quirks;
++
++	host->irq = tangox_hosts[idx].irq;
++	host->ioaddr = (void __iomem* )tangox_hosts[idx].base;
++
++	//printk("sdhci_tangox_probe_slot: pad is set......!!");
++	sdhci_writel(host, 0x00000008, 0x0100);
++
++	if (chip->fixes && chip->fixes->probe_slot) {
++		ret = chip->fixes->probe_slot(slot);
++		if (ret)
++			goto free;
++	}
++
++	ret = sdhci_add_host(host);
++	if (ret)
++		goto remove;
++
++	
++	return slot;
++
++remove:
++	if (chip->fixes && chip->fixes->remove_slot)
++		chip->fixes->remove_slot(slot, 0);
++
++free:
++	sdhci_free_host(host);
++
++	return ERR_PTR(ret);
++}
++
++static void sdhci_tangox_remove_slot(struct sdhci_tangox_slot *slot)
++{
++	int dead;
++	u32 scratch;
++
++	dead = 0;
++	scratch = readl(slot->host->ioaddr + SDHCI_INT_STATUS);
++	if (scratch == (u32)-1)
++		dead = 1;
++
++	sdhci_remove_host(slot->host, dead);
++
++	if (slot->chip->fixes && slot->chip->fixes->remove_slot)
++		slot->chip->fixes->remove_slot(slot, dead);
++
++	sdhci_free_host(slot->host);
++}
++
++static int sdhci_tangox_probe(struct device *pdev)
++{
++	struct sdhci_tangox_chip *chip;
++	struct sdhci_tangox_slot *slot;
++	u8 slots;
++	int ret, i;
++#if defined(CONFIG_TANGO3)
++	unsigned long tangox_chip_id(void);
++	int tangox_sdio_enabled(int i);
++	unsigned long chip_id = tangox_chip_id();
++	unsigned int enabled_hosts = 0;
++	unsigned int extra_quirks = 0;
++
++	if (((chip_id & 0xfff00000) != 0x86400000) && ((chip_id & 0xfffe0000) != 0x86520000) && ((chip_id & 0xfff00000) != 0x86700000) ) {
++		printk(KERN_ERR "SDIO is not supported.\n");
++		return -EIO;
++	} else {
++		/* 864x, 8652, or 867x */
++		switch((chip_id & 0xfff00000) >> 16) {
++			case 0x8650: { /* only 8652 as all other 865x got filtered out prior */
++					switch(chip_id & 0xff) { /* check revision */
++						case 0x1:
++							printk(KERN_ERR "SDIO is not supported.\n");
++							return -EIO;
++						default:
++							extra_quirks |= SDHCI_QUIRK_BROKEN_ADMA;
++							enabled_hosts = 3; /* 2 hosts, one bit per host */
++							if (force_speed <= 0)
++								extra_quirks |= SDHCI_QUIRK_BROKEN_HIGH_SPEED_MODE; /* extra quirks */
++							break;
++					}
++				}
++				break;
++			case 0x8640: {
++					enabled_hosts = 1; /* 1 host */
++					extra_quirks |= SDHCI_QUIRK_BROKEN_ADMA;
++					switch((chip_id & 0xfffe0000) >> 16) {
++						case 0x8646:
++							if (force_speed == 0)
++								extra_quirks |= SDHCI_QUIRK_BROKEN_HIGH_SPEED_MODE; /* extra quirks */
++							else
++								gbus_write_reg32(TANGOX_SDIO_BASE_ADDR + 0x10c, 0x0fc00780); /* enable high speed mode */
++							break;
++						default:
++							if (force_speed <= 0)
++								extra_quirks |= SDHCI_QUIRK_BROKEN_HIGH_SPEED_MODE; /* extra quirks */
++							break;
++					}
++				}
++				break;
++			case 0x8670: {
++					enabled_hosts = 3; /* 2 hosts, one bit per host */
++					switch((chip_id & 0xfffe0000) >> 16) {
++						case 0x8670:
++							extra_quirks |= SDHCI_QUIRK_BROKEN_ADMA;
++							if (force_speed == 0)
++								extra_quirks |= SDHCI_QUIRK_BROKEN_HIGH_SPEED_MODE; /* extra quirks */
++							else {
++								gbus_write_reg32(TANGOX_SDIO_BASE_ADDR + 0x128, 0x00400000); /* enable high speed mode */
++								gbus_write_reg32(TANGOX_SDIO_BASE_ADDR1 + 0x128, 0x00400000); /* enable high speed mode */
++							}
++							break;
++						case 0x8672:
++						case 0x8674:
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR + 0x100, 0x00000008); /* select SDIO from Eth1 pad */
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR + 0x140, 0x247f9a74); /* set up CAP_IN */
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR + 0x144, 0x000c0008);
++							/* ??? */
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR + 0x128, 0x0004022c);
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR + 0x12c, 0x00000002);
++
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR1 + 0x100, 0x00000008); /* select SDIO */
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR1 + 0x140, 0x247f9a74); /* set up CAP_IN */
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR1 + 0x144, 0x000c0008);
++							/* ??? */
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR1 + 0x128, 0x0004022c);
++							gbus_write_reg32(TANGOX_SDIO_BASE_ADDR1 + 0x12c, 0x00000002);
++
++							udelay(10); /* just to be sure ... */
++
++							tangox_hosts[1].irq = IRQ_CONTROLLER_IRQ_BASE + LOG2_CPU_RTC_INT;
++							if (force_speed == 0)
++								extra_quirks |= SDHCI_QUIRK_BROKEN_HIGH_SPEED_MODE; /* extra quirks */
++							break;
++						default: /* Unknown 867x chip */
++							printk(KERN_ERR "SDIO is not supported.\n");
++							return -EIO;
++					}
++				}
++				break;
++			default:
++				printk(KERN_ERR "SDIO is not supported.\n");
++				return -EIO;
++		}
++	}
++
++	if (tangox_sdio_enabled(0) == 0)
++		enabled_hosts &= ~1; /* host 0 is disabled */
++	if (tangox_sdio_enabled(1) == 0)
++		enabled_hosts &= ~2; /* host 1 is disabled */
++	sdio_hosts &= enabled_hosts;
++	if (sdio_hosts == 0) {
++		printk(KERN_ERR "SDIO0/1 are disabled via XENV or module parameters.\n");
++		return -EIO;
++	} else {
++		if (sdio_hosts & 1)
++			printk(KERN_INFO "SDIO0 is enabled.\n");
++		if (sdio_hosts & 2)
++			printk(KERN_INFO "SDIO1 is enabled.\n");
++	}
++#endif
++	BUG_ON(pdev == NULL);
++
++	// TODO: hard coded 
++	slots = MAX_SLOTS;
++
++	BUG_ON(slots > MAX_SLOTS);
++
++
++	chip = kzalloc(sizeof(struct sdhci_tangox_chip), GFP_KERNEL);
++	if (!chip) {
++		ret = -ENOMEM;
++		goto err;
++	}
++
++	chip->pdev = pdev;
++	chip->fixes = (struct sdhci_tangox_fixes *)&sdhci_tangox;
++	if (chip->fixes) {
++		chip->fixes->quirks |= extra_quirks;
++		chip->quirks = chip->fixes->quirks;
++	}
++	chip->num_slots = slots;
++
++	dev_set_drvdata(pdev, chip);
++
++	if (chip->fixes && chip->fixes->probe) {
++		ret = chip->fixes->probe(chip);
++		if (ret)
++			goto free;
++	}
++
++	for (i = 0; i < slots; i++) {
++		if (sdio_hosts & (i + 1)){
++			slot = sdhci_tangox_probe_slot(pdev, chip, i);
++			if (IS_ERR(slot)) {
++				for (i--; i >= 0; i--)
++					sdhci_tangox_remove_slot(chip->slots[i]);
++				ret = PTR_ERR(slot);
++				goto free;
++			}
++
++			chip->slots[i] = slot;
++		}
++		else
++			chip->slots[i] = NULL;
++
++	}
++
++	return 0;
++
++free:
++	dev_set_drvdata(pdev, NULL);  /* clear private data ptr */
++	kfree(chip);
++
++err:
++	// TODO: disabling device?
++	return ret;
++}
++
++static int sdhci_tangox_remove(struct device *pdev)
++{
++	int i;
++	struct sdhci_tangox_chip *chip;
++
++	chip = dev_get_drvdata(pdev);
++
++	if (chip) {
++		for (i = 0; i < chip->num_slots; i++) {
++			if (chip->slots[i]) 
++				sdhci_tangox_remove_slot(chip->slots[i]);
++		}
++		dev_set_drvdata(pdev, NULL);  /* clear private data ptr */
++		kfree(chip);
++	}
++
++	// TODO: disabling device?
++	
++	return 0;
++}
++
++static void tangox_sdio_release_dev(struct device * dev)
++{
++        dev->parent = NULL;
++}
++
++static struct device_driver sdhci_driver0 = {
++	.name =		"sdhci0-tangox",
++	.bus  =		&platform_bus_type,
++	.probe = 	sdhci_tangox_probe,
++	.remove =	sdhci_tangox_remove,
++	.suspend =	sdhci_tangox_suspend,
++	.resume	=	sdhci_tangox_resume,
++};
++
++static struct platform_device tangox_sdio_device0 = {
++	.name = 	(char *)"sdhci0-tangox",
++	.id = 		-1,
++	.dev = {
++		.release =	tangox_sdio_release_dev,
++	},
++	.num_resources  = 0,
++	.resource       = 0,
++};
++
++static struct platform_device *tangox_platform_sdio0[] __initdata = {
++        &tangox_sdio_device0,
++};
++
++/*****************************************************************************\
++ *                                                                           *
++ * Driver init/exit                                                          *
++ *                                                                           *
++\*****************************************************************************/
++
++static int __init tangox_sdhci_drv_init(void)
++{
++	int status = 0;
++  
++	//printk("tangox_sdhci_drv_init in\n");
++	/* Device 0 registration */
++	status = platform_add_devices(tangox_platform_sdio0, ARRAY_SIZE(tangox_platform_sdio0));
++	if (status) {
++		printk(KERN_ERR "Failed to register device 0.\n");
++		goto err_out;
++	}
++	/* Driver 0 registration*/
++   	status = driver_register(&sdhci_driver0);
++	if (status) {
++		platform_device_unregister(&tangox_sdio_device0);
++		printk(KERN_ERR "Failed to register driver 0.\n");
++	}
++	//printk("tangox_sdhci_drv_init out\n");
++err_out:
++	return status;
++}
++
++static void __exit tangox_sdhci_drv_exit(void)
++{
++	driver_unregister(&sdhci_driver0); 
++	platform_device_unregister(&tangox_sdio_device0);
++}
++
++module_init(tangox_sdhci_drv_init);
++module_exit(tangox_sdhci_drv_exit);
++module_param(sdio_hosts,	uint,	0444);
++module_param(force_speed,	int,	0444);
++MODULE_PARM_DESC(sdio_hosts,	"SDIO hosts being enabled");
++MODULE_PARM_DESC(force_speed,	"-1: auto, 0: low, 1: high");
++MODULE_AUTHOR("TANGOX standalone team");
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR ("Sigma Designs Inc.");
++MODULE_DESCRIPTION("TANGOX Secure Digital Host Controller Interface driver");
++
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/tmio_mmc.c linux-2.6.29/drivers/mmc/host/tmio_mmc.c
+--- linux-2.6.29.ref/drivers/mmc/host/tmio_mmc.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/tmio_mmc.c	2011-05-31 10:42:56.603953873 -0700
+@@ -568,11 +568,11 @@
+ 	host->mmc = mmc;
+ 	platform_set_drvdata(dev, mmc);
+ 
+-	host->ctl = ioremap(res_ctl->start, res_ctl->end - res_ctl->start);
++	host->ctl = ioremap(res_ctl->start, resource_size(res_ctl));
+ 	if (!host->ctl)
+ 		goto host_free;
+ 
+-	host->cnf = ioremap(res_cnf->start, res_cnf->end - res_cnf->start);
++	host->cnf = ioremap(res_cnf->start, resource_size(res_cnf));
+ 	if (!host->cnf)
+ 		goto unmap_ctl;
+ 
+@@ -650,10 +650,10 @@
+ 	if (mmc) {
+ 		struct tmio_mmc_host *host = mmc_priv(mmc);
+ 		mmc_remove_host(mmc);
+-		mmc_free_host(mmc);
+ 		free_irq(host->irq, host);
+ 		iounmap(host->ctl);
+ 		iounmap(host->cnf);
++		mmc_free_host(mmc);
+ 	}
+ 
+ 	return 0;
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/tmio_mmc.h linux-2.6.29/drivers/mmc/host/tmio_mmc.h
+--- linux-2.6.29.ref/drivers/mmc/host/tmio_mmc.h	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/tmio_mmc.h	2011-05-31 10:42:56.603953873 -0700
+@@ -8,6 +8,9 @@
+  * published by the Free Software Foundation.
+  *
+  */
++
++#include <linux/highmem.h>
++
+ #define CNF_CMD     0x04
+ #define CNF_CTL_BASE   0x10
+ #define CNF_INT_PIN  0x3d
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/drivers/mmc/host/wbsd.c linux-2.6.29/drivers/mmc/host/wbsd.c
+--- linux-2.6.29.ref/drivers/mmc/host/wbsd.c	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/drivers/mmc/host/wbsd.c	2011-05-31 10:42:56.603953873 -0700
+@@ -2036,7 +2036,7 @@
+ module_param_named(dma, param_dma, int, 0444);
+ 
+ MODULE_LICENSE("GPL");
+-MODULE_AUTHOR("Pierre Ossman <drzeus@drzeus.cx>");
++MODULE_AUTHOR("Pierre Ossman <pierre@ossman.eu>");
+ MODULE_DESCRIPTION("Winbond W83L51xD SD/MMC card interface driver");
+ 
+ #ifdef CONFIG_PNP
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/include/linux/mmc/host.h linux-2.6.29/include/linux/mmc/host.h
+--- linux-2.6.29.ref/include/linux/mmc/host.h	2009-06-16 04:17:03.000000000 -0700
++++ linux-2.6.29/include/linux/mmc/host.h	2011-05-31 10:42:56.603953873 -0700
+@@ -192,5 +192,10 @@
+ 	wake_up_process(host->sdio_irq_thread);
+ }
+ 
++struct regulator;
++
++int mmc_regulator_get_ocrmask(struct regulator *supply);
++int mmc_regulator_set_ocr(struct regulator *supply, unsigned short vdd_bit);
++
+ #endif
+ 
+diff -Naur --exclude=CVS --exclude='*.o' --exclude='*.a' --exclude='*.so' --exclude='*.elf' --exclude=System.map --exclude=Makefile.d --exclude='*log' --exclude='*log2' --exclude='*~' --exclude='.*~' --exclude='.#*' --exclude='*.bak' --exclude='*.orig' --exclude='*.rej' --exclude='core.[0-9]*' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=.depend --exclude='.*.o.flags' --exclude='*.gz' --exclude=vmlinux --exclude=vmlinux.bin linux-2.6.29.ref/README.1026.sdio.patch linux-2.6.29/README.1026.sdio.patch
+--- linux-2.6.29.ref/README.1026.sdio.patch	1969-12-31 16:00:00.000000000 -0800
++++ linux-2.6.29/README.1026.sdio.patch	2011-05-31 10:43:52.570861077 -0700
+@@ -0,0 +1,20 @@
++Feature:
++--------
++SDIO interface support for SMP864x/SMP865x/SMP867x.
++
++Prerequisite patch numbers:
++---------------------------
++0000
++1000
++1001
++
++Primary author:
++---------------
++Max Lo/YH Lin/Craig Qu
++
++Related to which chip version SMP86xx xx=?
++-----------------------------------------
++Tango3 ES3 or above
++
++(linux patches) which CONFIG_... are provided:
++----------------------------------------------
